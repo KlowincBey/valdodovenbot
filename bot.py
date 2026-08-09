@@ -189,7 +189,6 @@ async def sildur(ctx):
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def slhepsi(ctx):
-    """Tüm kanalları tek seferde silmeye çalışır (riskli!)"""
     await ctx.send("💥 Tüm kanallar tek seferde siliniyor...")
     kanallar = ctx.guild.channels
     basarili = 0
@@ -205,7 +204,7 @@ async def slhepsi(ctx):
     
     await ctx.send(f"✅ **{basarili}** kanal silindi.\n❌ **{basarisiz}** kanal silinemedi.")
 
-# --- Hızlı spam (aynı anda tüm kanallara, 0.7 saniye bekle) ---
+# --- Hızlı spam ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def spam(ctx):
@@ -214,7 +213,7 @@ async def spam(ctx):
         await ctx.send("⚠️ Zaten spam aktif.")
         return
     spam_aktif = True
-    await ctx.send("🔊 Hızlı spam başladı! Tüm kanallara aynı anda mesaj gidiyor. (!dur ile durdur)")
+    await ctx.send("🔊 Hızlı spam başladı! (!dur ile durdur)")
     while spam_aktif:
         tasks = []
         for kanal in ctx.guild.text_channels:
@@ -223,7 +222,7 @@ async def spam(ctx):
         await asyncio.sleep(0.7)
     await ctx.send("✅ Spam durduruldu.")
 
-# --- Yavaş spam (tek tek) ---
+# --- Yavaş spam ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def spamyavas(ctx):
@@ -232,15 +231,15 @@ async def spamyavas(ctx):
         await ctx.send("⚠️ Zaten spam aktif.")
         return
     spam_aktif = True
-    await ctx.send("🐢 Yavaş spam başladı! Kanallar tek tek mesaj alacak. (!dur ile durdur)")
+    await ctx.send("🐢 Yavaş spam başladı! (!dur ile durdur)")
     while spam_aktif:
         for kanal in ctx.guild.text_channels:
             if not spam_aktif:
                 break
             try:
                 await kanal.send("Valdo/Klowinc Siker .d")
-            except Exception as e:
-                print(f"Spam hatası: {e}")
+            except:
+                pass
         await asyncio.sleep(0.5)
     await ctx.send("✅ Spam durduruldu.")
 
@@ -252,27 +251,26 @@ async def dur(ctx):
     spam_aktif = False
     await ctx.send("🛑 Spam durduruldu.")
 
-# --- Diğer Yıkım Komutları ---
+# --- Rol oluştur/sil ---
 @bot.command()
 @commands.has_permissions(manage_roles=True)
 async def roluştur(ctx, *, isim):
     try:
         rol = await ctx.guild.create_role(name=isim)
-        embed = discord.Embed(description=f"✅ `{rol.name}` adlı rol oluşturuldu!", color=discord.Color.green())
-        await ctx.send(embed=embed)
+        await ctx.send(f"✅ `{rol.name}` adlı rol oluşturuldu!")
     except Exception as e:
-        await ctx.send(f"❌ Rol oluşturulamadı: {e}")
+        await ctx.send(f"❌ Hata: {e}")
 
 @bot.command()
 @commands.has_permissions(manage_roles=True)
 async def rolsil(ctx, rol: discord.Role):
     try:
         await rol.delete()
-        embed = discord.Embed(description=f"✅ `{rol.name}` adlı rol silindi!", color=discord.Color.red())
-        await ctx.send(embed=embed)
+        await ctx.send(f"✅ `{rol.name}` adlı rol silindi!")
     except Exception as e:
-        await ctx.send(f"❌ Rol silinemedi: {e}")
+        await ctx.send(f"❌ Hata: {e}")
 
+# --- Everyone, kanal kilitle/aç ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def everyone(ctx, *, mesaj):
@@ -286,8 +284,7 @@ async def kanalkilit(ctx):
             await kanal.set_permissions(ctx.guild.default_role, send_messages=False)
         except:
             pass
-    embed = discord.Embed(description="🔒 Tüm kanallar kilitlendi!", color=discord.Color.dark_red())
-    await ctx.send(embed=embed)
+    await ctx.send("🔒 Tüm kanallar kilitlendi!")
 
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -297,42 +294,31 @@ async def kanalaç(ctx):
             await kanal.set_permissions(ctx.guild.default_role, send_messages=None)
         except:
             pass
-    embed = discord.Embed(description="🔓 Tüm kanalların kilidi açıldı!", color=discord.Color.green())
-    await ctx.send(embed=embed)
+    await ctx.send("🔓 Tüm kanalların kilidi açıldı!")
 
 # ========================
-# ESKİ EĞLENCE (Embed)
+# ESKİ KOMUTLAR
 # ========================
 
 @bot.command()
 async def valdo(ctx):
-    embed = discord.Embed(description="YARRAMM VALDO BU KIM AMK", color=discord.Color.red())
-    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
-    await ctx.send(embed=embed)
+    await ctx.send("YARRAMM VALDO BU KIM AMK")
 
 @bot.command()
 async def gonu(ctx):
-    embed = discord.Embed(description="2 GUNDE 48 CK ATAN ADAM", color=discord.Color.green())
-    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
-    await ctx.send(embed=embed)
+    await ctx.send("2 GUNDE 48 CK ATAN ADAM")
 
 @bot.command()
 async def eternal(ctx):
-    embed = discord.Embed(description="FURKANIN NAMIDEGER BABASI", color=discord.Color.blue())
-    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
-    await ctx.send(embed=embed)
+    await ctx.send("FURKANIN NAMIDEGER BABASI")
 
 @bot.command()
 async def klowinc(ctx):
-    embed = discord.Embed(description="BU ADAMIN TASSAKLARINA BETON YETMEZ", color=discord.Color.gold())
-    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
-    await ctx.send(embed=embed)
+    await ctx.send("BU ADAMIN TASSAKLARINA BETON YETMEZ")
 
 @bot.command()
 async def doruk(ctx):
-    embed = discord.Embed(description="ARİEL BABAAAA", color=discord.Color.purple())
-    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
-    await ctx.send(embed=embed)
+    await ctx.send("ARİEL BABAAAA")
 
 # --- MEDYA ---
 @bot.command()
@@ -364,14 +350,14 @@ async def furkanvideo(ctx):
 async def zar(ctx):
     sonuc = random.randint(1, 6)
     zar_emoji = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
-    embed = discord.Embed(title="🎲 Zar Atıldı", description=f"**{sonuc}** {zar_emoji[sonuc-1]}", color=discord.Color.blue())
+    embed = discord.Embed(title="🎲 Zar", description=f"**{sonuc}** {zar_emoji[sonuc-1]}", color=discord.Color.blue())
     embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
     await ctx.send(embed=embed)
 
 @bot.command()
 async def yazitura(ctx):
     sonuc = random.choice(["Yazı", "Tura"])
-    embed = discord.Embed(title="🪙 Yazı Tura", description=f"**{sonuc}** geldi!", color=discord.Color.green())
+    embed = discord.Embed(title="🪙 Yazı Tura", description=f"**{sonuc}**", color=discord.Color.green())
     embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
     await ctx.send(embed=embed)
 
@@ -384,14 +370,7 @@ async def şanslısayı(ctx):
 
 @bot.command()
 async def korkut(ctx):
-    korkular = [
-        "👻 Arkanda biri var!",
-        "💀 Gece yarısı kapını çalacaklar...",
-        "🔪 Sessiz ol, seni izliyorlar!",
-        "🕷️ Yatağının altında bir şey var...",
-        "🧟 Zombi saldırısı başladı!",
-        "👽 Uzaylılar geldi, kaç!"
-    ]
+    korkular = ["👻 Arkanda biri var!", "💀 Gece yarısı kapını çalacaklar...", "🔪 Sessiz ol, seni izliyorlar!", "🕷️ Yatağının altında bir şey var...", "🧟 Zombi saldırısı başladı!", "👽 Uzaylılar geldi, kaç!"]
     embed = discord.Embed(title="👻 KORKU", description=random.choice(korkular), color=discord.Color.dark_red())
     embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
     await ctx.send(embed=embed)
@@ -401,21 +380,21 @@ async def aşkfalı(ctx, *, isim=None):
     if isim is None:
         isim = ctx.author.display_name
     uyeler = [uye for uye in ctx.guild.members if not uye.bot and uye != ctx.author]
-    if uyeler:
-        secilen = random.choice(uyeler)
-        yorumlar = [
-            f"{isim}, bu hafta aşk hayatında sürpriz bir gelişme olacak! Belki de **{secilen.display_name}** ile aranda bir şeyler olabilir.",
-            f"{isim}, kalbinin sesini dinle, doğru kişi yakında. **{secilen.display_name}**'e dikkat et.",
-            f"{isim}, eski bir aşk yeniden ortaya çıkabilir. Ama **{secilen.display_name}** yeni bir umut.",
-            f"{isim}, bu ay yalnız kalmayacaksın, **{secilen.display_name}** ile tanışacaksın.",
-            f"{isim}, aşk falına göre çok yakında kalbin pır pır edecek. **{secilen.display_name}** kalbini çalabilir."
-        ]
-        embed = discord.Embed(title="🔮 Aşk Falı", description=random.choice(yorumlar), color=discord.Color.magenta())
-        embed.set_thumbnail(url=secilen.avatar.url)
-        embed.set_footer(text=f"{ctx.author.display_name} için fal", icon_url=ctx.author.avatar.url)
-        await ctx.send(embed=embed)
-    else:
+    if not uyeler:
         await ctx.send("❌ Yeterli üye yok.")
+        return
+    secilen = random.choice(uyeler)
+    yorumlar = [
+        f"{isim}, bu hafta aşk hayatında sürpriz bir gelişme olacak! Belki de **{secilen.display_name}** ile aranda bir şeyler olabilir.",
+        f"{isim}, kalbinin sesini dinle, doğru kişi yakında. **{secilen.display_name}**'e dikkat et.",
+        f"{isim}, eski bir aşk yeniden ortaya çıkabilir. Ama **{secilen.display_name}** yeni bir umut.",
+        f"{isim}, bu ay yalnız kalmayacaksın, **{secilen.display_name}** ile tanışacaksın.",
+        f"{isim}, aşk falına göre çok yakında kalbin pır pır edecek. **{secilen.display_name}** kalbini çalabilir."
+    ]
+    embed = discord.Embed(title="🔮 Aşk Falı", description=random.choice(yorumlar), color=discord.Color.magenta())
+    embed.set_thumbnail(url=secilen.avatar.url)
+    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+    await ctx.send(embed=embed)
 
 @bot.command()
 async def tarih(ctx):
@@ -556,7 +535,7 @@ async def yılankavi(ctx):
 @bot.command()
 async def kupa(ctx):
     ulkeler = ["Fransa", "Brezilya", "Almanya", "Arjantin", "İngiltere", "İtalya", "İspanya", "Uruguay"]
-    embed = discord.Embed(title="🏆 Dünya Kupası Şampiyonu", description=f"Rastgele şampiyon: **{random.choice(ulkeler)}**", color=discord.Color.gold())
+    embed = discord.Embed(title="🏆 Dünya Kupası", description=f"Şampiyon: **{random.choice(ulkeler)}**", color=discord.Color.gold())
     embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
     await ctx.send(embed=embed)
 
@@ -579,10 +558,7 @@ async def ünlü(ctx):
     embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
     await ctx.send(embed=embed)
 
-# ========================
-# MEDYA API'Lİ KOMUTLAR
-# ========================
-
+# --- Kedi, Köpek ---
 @bot.command()
 async def kedi(ctx):
     try:
@@ -613,77 +589,122 @@ async def köpek(ctx):
 @bot.command()
 async def sunucubilgi(ctx):
     guild = ctx.guild
-    embed = discord.Embed(title=f"📊 {guild.name} Sunucu Bilgisi", color=discord.Color.blue())
+    embed = discord.Embed(title=f"📊 {guild.name}", color=discord.Color.blue())
     embed.set_thumbnail(url=guild.icon.url if guild.icon else None)
     embed.add_field(name="👑 Sahip", value=guild.owner.mention, inline=True)
-    embed.add_field(name="👥 Üye Sayısı", value=guild.member_count, inline=True)
+    embed.add_field(name="👥 Üye", value=guild.member_count, inline=True)
     embed.add_field(name="📅 Oluşturulma", value=guild.created_at.strftime("%d/%m/%Y"), inline=True)
-    embed.add_field(name="💬 Kanal Sayısı", value=len(guild.channels), inline=True)
-    embed.add_field(name="🎭 Rol Sayısı", value=len(guild.roles), inline=True)
-    embed.add_field(name="🌍 Bölge", value=str(guild.region) if guild.region else "Belirtilmemiş", inline=True)
+    embed.add_field(name="💬 Kanal", value=len(guild.channels), inline=True)
+    embed.add_field(name="🎭 Rol", value=len(guild.roles), inline=True)
     await ctx.send(embed=embed)
 
 @bot.command()
 async def rolbilgi(ctx, rol: discord.Role):
-    embed = discord.Embed(title=f"🎭 {rol.name} Rol Bilgisi", color=rol.color)
+    embed = discord.Embed(title=f"🎭 {rol.name}", color=rol.color)
     embed.add_field(name="ID", value=rol.id, inline=True)
     embed.add_field(name="Renk", value=str(rol.color), inline=True)
     embed.add_field(name="Üye Sayısı", value=len(rol.members), inline=True)
     embed.add_field(name="Oluşturulma", value=rol.created_at.strftime("%d/%m/%Y"), inline=True)
-    embed.add_field(name="Bot mu?", value="Evet" if rol.is_bot_managed() else "Hayır", inline=True)
     embed.add_field(name="Yönetici mi?", value="Evet" if rol.permissions.administrator else "Hayır", inline=True)
     await ctx.send(embed=embed)
 
-# ========================
-# SOSYAL KOMUTLAR
-# ========================
-
+# --- SOSYAL KOMUTLAR ---
 @bot.command()
 async def öp(ctx, member: discord.Member):
-    embed = discord.Embed(description=f"{ctx.author.mention} 💋 {member.mention} adlı kişiyi öptü! 🥰", color=discord.Color.pink())
+    embed = discord.Embed(description=f"{ctx.author.mention} 💋 {member.mention} öptü! 🥰", color=discord.Color.pink())
     embed.set_thumbnail(url=member.avatar.url)
-    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
     await ctx.send(embed=embed)
 
 @bot.command()
 async def tokat(ctx, member: discord.Member):
-    embed = discord.Embed(description=f"{ctx.author.mention} 👋 {member.mention} adlı kişiye bir tokat attı! ***ŞAK***", color=discord.Color.red())
+    embed = discord.Embed(description=f"{ctx.author.mention} 👋 {member.mention} tokat attı! ***ŞAK***", color=discord.Color.red())
     embed.set_thumbnail(url=member.avatar.url)
-    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
     await ctx.send(embed=embed)
 
 @bot.command()
 async def kartopu(ctx, member: discord.Member):
-    embed = discord.Embed(description=f"{ctx.author.mention} ⛄ {member.mention} adlı kişiye kartopu fırlattı! ❄️", color=discord.Color.light_grey())
+    embed = discord.Embed(description=f"{ctx.author.mention} ⛄ {member.mention} kartopu fırlattı! ❄️", color=discord.Color.light_grey())
     embed.set_thumbnail(url=member.avatar.url)
-    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
     await ctx.send(embed=embed)
 
 @bot.command()
 async def beşlik(ctx, member: discord.Member):
-    embed = discord.Embed(description=f"{ctx.author.mention} 🙏 {member.mention} ile beşlik çaktı! ÇAKK", color=discord.Color.green())
+    embed = discord.Embed(description=f"{ctx.author.mention} 🙏 {member.mention} beşlik çaktı!", color=discord.Color.green())
     embed.set_thumbnail(url=member.avatar.url)
-    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
     await ctx.send(embed=embed)
 
 @bot.command()
 async def sarıl(ctx, member: discord.Member):
-    embed = discord.Embed(description=f"{ctx.author.mention} 🤗 {member.mention} adlı kişiye sarıldı! 🤗", color=discord.Color.magenta())
+    embed = discord.Embed(description=f"{ctx.author.mention} 🤗 {member.mention} sarıldı!", color=discord.Color.magenta())
     embed.set_thumbnail(url=member.avatar.url)
-    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
     await ctx.send(embed=embed)
 
 @bot.command()
 async def tekme(ctx, member: discord.Member):
-    embed = discord.Embed(description=f"{ctx.author.mention} 🦵 {member.mention} adlı kişiye bir tekme attı! ***PAT***", color=discord.Color.dark_red())
+    embed = discord.Embed(description=f"{ctx.author.mention} 🦵 {member.mention} tekme attı!", color=discord.Color.dark_red())
     embed.set_thumbnail(url=member.avatar.url)
-    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
     await ctx.send(embed=embed)
 
-# ========================
-# OYUNLAR
-# ========================
-
+# --- OYUNLAR ---
 @bot.command()
 async def adam_asmaca(ctx):
-    kelimeler = ['python', 'discord', 'yaz
+    kelimeler = ['python', 'discord', 'yazılım', 'bot', 'sunucu', 'klowinc']
+    kelime = random.choice(kelimeler)
+    tahmin = ['_'] * len(kelime)
+    can = 5
+    tahmin_edilen = []
+    
+    while can > 0 and '_' in tahmin:
+        ascii_resim = adam_ascii(can)
+        embed = discord.Embed(
+            title="🔤 Adam Asmaca",
+            description=f"```\n{ascii_resim}\n```\n**Kelime:** {' '.join(tahmin)}\n**Kalan Can:** {can}\n**Tahminlerin:** {', '.join(tahmin_edilen) if tahmin_edilen else 'Yok'}",
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+        await ctx.send(embed=embed)
+        
+        def kontrol(m):
+            return m.author == ctx.author and m.channel == ctx.channel and len(m.content) == 1 and m.content.isalpha()
+        
+        try:
+            msg = await bot.wait_for('message', timeout=30.0, check=kontrol)
+            harf = msg.content.lower()
+        except asyncio.TimeoutError:
+            await ctx.send(f"⏰ Zaman aşımı! Kelime: **{kelime}**")
+            return
+        
+        if harf in tahmin_edilen:
+            await ctx.send("Bu harfi zaten tahmin ettin!")
+            continue
+        
+        tahmin_edilen.append(harf)
+        if harf in kelime:
+            for i, h in enumerate(kelime):
+                if h == harf:
+                    tahmin[i] = harf
+            await ctx.send(f"✅ '{harf}' harfi kelimede var!")
+        else:
+            can -= 1
+            await ctx.send(f"❌ '{harf}' harfi kelimede yok! Can: {can}")
+    
+    if '_' not in tahmin:
+        embed = discord.Embed(title="🎉 Tebrikler!", description=f"Kelime: **{kelime}**", color=discord.Color.gold())
+        embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+        await ctx.send(embed=embed)
+    else:
+        embed = discord.Embed(title="💀 Kaybettin!", description=f"Kelime: **{kelime}**", color=discord.Color.dark_red())
+        embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+        await ctx.send(embed=embed)
+
+@bot.command()
+async def sayı_tahmin(ctx):
+    sayi = random.randint(1, 50)
+    deneme = 0
+    embed = discord.Embed(title="🎯 Sayı Tahmin", description="1-50 arası tahmin et! (10 hakkın)", color=discord.Color.green())
+    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+    await ctx.send(embed=embed)
+    
+    while deneme < 10:
+        try:
+            msg = await bot.wait_for('message', timeout=30.0, check=lambda m: m
