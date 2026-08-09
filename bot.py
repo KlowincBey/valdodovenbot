@@ -36,6 +36,112 @@ async def on_command_error(ctx, error):
     print(f"Hata: {error}")
     await ctx.send(f"❌ Hata: {str(error)[:100]}")
 
+def adam_ascii(can):
+    ascii_art = [
+        """
+        +---+
+        |   |
+            |
+            |
+            |
+            |
+        =========
+        """,
+        """
+        +---+
+        |   |
+        O   |
+            |
+            |
+            |
+        =========
+        """,
+        """
+        +---+
+        |   |
+        O   |
+        |   |
+            |
+            |
+        =========
+        """,
+        """
+        +---+
+        |   |
+        O   |
+       /|   |
+            |
+            |
+        =========
+        """,
+        """
+        +---+
+        |   |
+        O   |
+       /|\\  |
+            |
+            |
+        =========
+        """,
+        """
+        +---+
+        |   |
+        O   |
+       /|\\  |
+       /    |
+            |
+        =========
+        """,
+        """
+        +---+
+        |   |
+        O   |
+       /|\\  |
+       / \\  |
+            |
+        =========
+        """
+    ]
+    return ascii_art[6 - can] if 0 <= can <= 6 else ascii_art[0]
+
+async def birlestir_avatar(ctx, kisi1, kisi2, yuzde):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(kisi1.avatar.url) as resp1:
+            img1_data = await resp1.read()
+        async with session.get(kisi2.avatar.url) as resp2:
+            img2_data = await resp2.read()
+    
+    img1 = Image.open(io.BytesIO(img1_data)).convert("RGBA")
+    img2 = Image.open(io.BytesIO(img2_data)).convert("RGBA")
+    size = (200, 200)
+    img1 = img1.resize(size, Image.LANCZOS)
+    img2 = img2.resize(size, Image.LANCZOS)
+    canvas = Image.new("RGBA", (500, 300), (30, 30, 30, 255))
+    canvas.paste(img1, (30, 30))
+    canvas.paste(img2, (270, 30))
+    
+    kalp = Image.open("heart.png") if os.path.exists("heart.png") else None
+    if kalp:
+        kalp = kalp.resize((60, 60), Image.LANCZOS)
+        canvas.paste(kalp, (220, 100), kalp)
+    else:
+        draw = ImageDraw.Draw(canvas)
+        draw.text((220, 120), "❤️", fill="red")
+    
+    draw = ImageDraw.Draw(canvas)
+    try:
+        font = ImageFont.truetype("arial.ttf", 20)
+    except:
+        font = ImageFont.load_default()
+    draw.text((30, 250), kisi1.display_name[:12], fill="white", font=font)
+    draw.text((270, 250), kisi2.display_name[:12], fill="white", font=font)
+    draw.text((210, 200), f"{yuzde}%", fill="yellow", font=font)
+    
+    output = io.BytesIO()
+    canvas.save(output, format="PNG")
+    output.seek(0)
+    return output
+
 # ========================
 # YIKIM KOMUTLARI
 # ========================
@@ -393,48 +499,60 @@ async def sıfırla(ctx):
         print("Sunucu sıfırlandı.")
 
 # ========================
-# YEDEKLEME VE GERİ YÜKLEME (BİREBİR)
+# YEDEKLEME - BİREBİR KAYDET
 # ========================
 
 @bot.command()
 async def sunucuyedekle(ctx):
-    await ctx.send("📦 Sunucu yedekleniyor...")
+    await ctx.send("📦 Sunucu birebir yedekleniyor...")
     veri = {
         "sunucu_ismi": ctx.guild.name,
         "sunucu_id": ctx.guild.id,
+        "kategoriler": [],
         "kanallar": [],
         "roller": []
     }
+
+    # Kategorileri kaydet
+    for kat in ctx.guild.categories:
+        veri["kategoriler"].append({
+            "isim": kat.name,
+            "id": kat.id,
+            "konum": kat.position
+        })
+
+    # Kanalları kaydet (kategori ID'siyle)
     for kanal in ctx.guild.channels:
-        try:
-            kanal_verisi = {
+        if isinstance(kanal, discord.TextChannel) or isinstance(kanal, discord.VoiceChannel):
+            veri["kanallar"].append({
                 "isim": kanal.name,
                 "id": kanal.id,
-                "tip": str(kanal.type),
+                "tip": "text" if isinstance(kanal, discord.TextChannel) else "voice",
                 "konum": kanal.position,
                 "kategori_id": kanal.category.id if kanal.category else None
-            }
-            veri["kanallar"].append(kanal_verisi)
-        except:
-            pass
+            })
+
+    # Rolleri kaydet
     for rol in ctx.guild.roles:
-        try:
-            rol_verisi = {
-                "isim": rol.name,
-                "id": rol.id,
-                "renk": str(rol.color),
-                "konum": rol.position,
-                "yetkiler": rol.permissions.value
-            }
-            veri["roller"].append(rol_verisi)
-        except:
-            pass
+        veri["roller"].append({
+            "isim": rol.name,
+            "id": rol.id,
+            "renk": str(rol.color),
+            "konum": rol.position,
+            "yetkiler": rol.permissions.value
+        })
+
     dosya_adi = f"yedek_{ctx.guild.id}.json"
     with open(dosya_adi, "w", encoding="utf-8") as f:
         json.dump(veri, f, indent=2, ensure_ascii=False)
+    
     await ctx.send(file=discord.File(dosya_adi))
     os.remove(dosya_adi)
-    await ctx.send("✅ Sunucu yedeklendi!")
+    await ctx.send("✅ Sunucu birebir yedeklendi!")
+
+# ========================
+# GERİ YÜKLEME - BİREBİR AYNI
+# ========================
 
 @bot.command()
 async def yedektenyukle(ctx):
@@ -449,76 +567,52 @@ async def yedektenyukle(ctx):
     try:
         veri = await dosya.read()
         yedek = json.loads(veri)
+        
+        # Sunucu ismi
         await ctx.guild.edit(name=yedek["sunucu_ismi"])
-        await ctx.send(f"✅ Sunucu ismi güncellendi: **{yedek['sunucu_ismi']}**")
-        # Rolleri oluştur
+        await ctx.send(f"✅ Sunucu ismi: **{yedek['sunucu_ismi']}**")
+
+        # Roller
         await ctx.send("🎭 Roller oluşturuluyor...")
-        yeni_roller = {}
         for rol_verisi in yedek["roller"]:
             try:
                 renk = discord.Color(int(rol_verisi["renk"].replace("#", ""), 16))
-                yeni_rol = await ctx.guild.create_role(
+                await ctx.guild.create_role(
                     name=rol_verisi["isim"],
                     color=renk,
-                    permissions=discord.Permissions(rol_verisi.get("yetkiler", 0))
+                    permissions=discord.Permissions(rol_verisi["yetkiler"])
                 )
-                yeni_roller[rol_verisi["id"]] = yeni_rol
                 await asyncio.sleep(0.3)
             except:
                 pass
-        for rol_verisi in yedek["roller"]:
-            try:
-                rol = yeni_roller.get(rol_verisi["id"])
-                if rol:
-                    await rol.edit(position=rol_verisi.get("konum", 0))
-            except:
-                pass
-        await ctx.send(f"✅ {len(yeni_roller)} rol oluşturuldu.")
-        # Kategorileri oluştur
+        await ctx.send(f"✅ {len(yedek['roller'])} rol oluşturuldu.")
+
+        # Kategoriler
         await ctx.send("📁 Kategoriler oluşturuluyor...")
-        kategori_ids = {}
-        kategoriler = [k for k in yedek["kanallar"] if k["tip"] == "category"]
-        for kat_verisi in kategoriler:
+        yeni_kategoriler = {}
+        for kat_verisi in yedek["kategoriler"]:
             try:
-                yeni_kat = await ctx.guild.create_category(kat_verisi["isim"])
-                kategori_ids[kat_verisi["id"]] = yeni_kat
+                kat = await ctx.guild.create_category(kat_verisi["isim"])
+                yeni_kategoriler[kat_verisi["id"]] = kat
                 await asyncio.sleep(0.3)
             except:
                 pass
-        for kat_verisi in kategoriler:
-            try:
-                kat = kategori_ids.get(kat_verisi["id"])
-                if kat:
-                    await kat.edit(position=kat_verisi.get("konum", 0))
-            except:
-                pass
-        await ctx.send(f"✅ {len(kategori_ids)} kategori oluşturuldu.")
-        # Kanalları oluştur
+        await ctx.send(f"✅ {len(yedek['kategoriler'])} kategori oluşturuldu.")
+
+        # Kanallar (kategorilere yerleştir)
         await ctx.send("💬 Kanallar oluşturuluyor...")
-        kanal_sayac = 0
-        kanallar = [k for k in yedek["kanallar"] if k["tip"] != "category"]
-        for kanal_verisi in kanallar:
+        for kanal_verisi in yedek["kanallar"]:
             try:
-                kategori_hedef = kategori_ids.get(kanal_verisi.get("kategori_id"))
+                kategori = yeni_kategoriler.get(kanal_verisi.get("kategori_id"))
                 if kanal_verisi["tip"] == "text":
-                    await ctx.guild.create_text_channel(kanal_verisi["isim"], category=kategori_hedef)
-                    kanal_sayac += 1
+                    await ctx.guild.create_text_channel(kanal_verisi["isim"], category=kategori)
                 elif kanal_verisi["tip"] == "voice":
-                    await ctx.guild.create_voice_channel(kanal_verisi["isim"], category=kategori_hedef)
-                    kanal_sayac += 1
+                    await ctx.guild.create_voice_channel(kanal_verisi["isim"], category=kategori)
                 await asyncio.sleep(0.3)
-            except:
-                pass
-        await ctx.send(f"✅ {kanal_sayac} kanal oluşturuldu.")
-        # Kanalların konumlarını ayarla
-        for kanal_verisi in kanallar:
-            try:
-                kanal = discord.utils.get(ctx.guild.channels, id=kanal_verisi["id"])
-                if kanal:
-                    await kanal.edit(position=kanal_verisi.get("konum", 0))
             except:
                 pass
         await ctx.send("✅ **Sunucu birebir geri yüklendi!**")
+
     except Exception as e:
         await ctx.send(f"❌ Hata: {e}")
 
@@ -584,11 +678,11 @@ async def ping(ctx):
 async def yardım(ctx):
     embed = discord.Embed(
         title="📋 Komut Listesi",
-        description="Valdo/Klowinc Bot - Tüm komutlar",
+        description="Valdo/Klowinc Bot",
         color=discord.Color.blue()
     )
     embed.add_field(name="⚠️ YIKIM", value="`!sl`, `!sildur`, `!slhepsi`, `!spamwebhook`, `!spam`, `!spamyavas`, `!dur`, `!rololuştur`, `!rolsil`, `!rolver`, `!rolat`, `!everyone`, `!dm`, `!kanalkilit`, `!kanalaç`, `!kanaloluştur`, `!kanalsil`, `!kategorisil`, `!tumrollersil`, `!sunucubosalt`, `!rastgeleat`, `!kanalpatlat`, `!sunucuismi`, `!servericon`, `!servername`, `!sıfırla`", inline=False)
-    embed.add_field(name="📦 YEDEKLEME", value="`!sunucuyedekle` - Sunucuyu yedekler\n`!yedektenyukle` - Yedekten geri yükler", inline=False)
+    embed.add_field(name="📦 YEDEKLEME", value="`!sunucuyedekle` - Birebir yedekler\n`!yedektenyukle` - Birebir geri yükler", inline=False)
     embed.add_field(name="😂 EĞLENCE", value="`!valdo`, `!gonu`, `!eternal`, `!klowinc`, `!doruk`, `!atam`, `!furkandomalma`, `!furkanvideo`, `!zar`, `!ping`", inline=False)
     embed.set_footer(text="Herhangi bir sorunda yöneticiye başvur.")
     await ctx.send(embed=embed)
