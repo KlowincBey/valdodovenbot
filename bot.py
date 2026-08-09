@@ -156,7 +156,6 @@ async def birlestir_avatar(ctx, kisi1, kisi2, yuzde):
 # YIKIM KOMUTLARI (Admin)
 # ========================
 
-# --- Yavaş silme (0.5 saniye arayla) ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def sl(ctx):
@@ -177,7 +176,6 @@ async def sl(ctx):
     silme_aktif = False
     await ctx.send("✅ Kanallar silme işlemi tamamlandı veya durduruldu.")
 
-# --- Durdur ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def sildur(ctx):
@@ -185,7 +183,6 @@ async def sildur(ctx):
     silme_aktif = False
     await ctx.send("🛑 Kanal silme durduruldu.")
 
-# --- TEK SEFERDE TÜM KANALLARI SİL ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def slhepsi(ctx):
@@ -204,7 +201,6 @@ async def slhepsi(ctx):
     
     await ctx.send(f"✅ **{basarili}** kanal silindi.\n❌ **{basarisiz}** kanal silinemedi.")
 
-# --- Hızlı spam ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def spam(ctx):
@@ -222,7 +218,6 @@ async def spam(ctx):
         await asyncio.sleep(0.7)
     await ctx.send("✅ Spam durduruldu.")
 
-# --- Yavaş spam ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def spamyavas(ctx):
@@ -243,7 +238,6 @@ async def spamyavas(ctx):
         await asyncio.sleep(0.5)
     await ctx.send("✅ Spam durduruldu.")
 
-# --- Spam durdur ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def dur(ctx):
@@ -251,7 +245,6 @@ async def dur(ctx):
     spam_aktif = False
     await ctx.send("🛑 Spam durduruldu.")
 
-# --- Rol oluştur/sil ---
 @bot.command()
 @commands.has_permissions(manage_roles=True)
 async def roluştur(ctx, *, isim):
@@ -270,7 +263,6 @@ async def rolsil(ctx, rol: discord.Role):
     except Exception as e:
         await ctx.send(f"❌ Hata: {e}")
 
-# --- Everyone, kanal kilitle/aç ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def everyone(ctx, *, mesaj):
@@ -320,7 +312,6 @@ async def klowinc(ctx):
 async def doruk(ctx):
     await ctx.send("ARİEL BABAAAA")
 
-# --- MEDYA ---
 @bot.command()
 async def atam(ctx):
     try:
@@ -493,7 +484,6 @@ async def avatar(ctx, member: discord.Member = None):
     embed.set_image(url=member.avatar.url)
     await ctx.send(embed=embed)
 
-# --- YENİ EĞLENCE KOMUTLARI ---
 @bot.command()
 async def kompliman(ctx):
     komplimanlar = [
@@ -558,7 +548,6 @@ async def ünlü(ctx):
     embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
     await ctx.send(embed=embed)
 
-# --- Kedi, Köpek ---
 @bot.command()
 async def kedi(ctx):
     try:
@@ -585,7 +574,6 @@ async def köpek(ctx):
     except:
         await ctx.send("❌ Köpek resmi getirilemedi.")
 
-# --- Sunucu Bilgi ---
 @bot.command()
 async def sunucubilgi(ctx):
     guild = ctx.guild
@@ -608,7 +596,6 @@ async def rolbilgi(ctx, rol: discord.Role):
     embed.add_field(name="Yönetici mi?", value="Evet" if rol.permissions.administrator else "Hayır", inline=True)
     await ctx.send(embed=embed)
 
-# --- SOSYAL KOMUTLAR ---
 @bot.command()
 async def öp(ctx, member: discord.Member):
     embed = discord.Embed(description=f"{ctx.author.mention} 💋 {member.mention} öptü! 🥰", color=discord.Color.pink())
@@ -645,7 +632,6 @@ async def tekme(ctx, member: discord.Member):
     embed.set_thumbnail(url=member.avatar.url)
     await ctx.send(embed=embed)
 
-# --- OYUNLAR ---
 @bot.command()
 async def adam_asmaca(ctx):
     kelimeler = ['python', 'discord', 'yazılım', 'bot', 'sunucu', 'klowinc']
@@ -707,4 +693,198 @@ async def sayı_tahmin(ctx):
     
     while deneme < 10:
         try:
-            msg = await bot.wait_for('message', timeout=30.0, check=lambda m: m
+            msg = await bot.wait_for('message', timeout=30.0, check=lambda m: m.author == ctx.author and m.channel == ctx.channel and m.content.isdigit())
+            tahmin = int(msg.content)
+            deneme += 1
+            
+            if tahmin < sayi:
+                await ctx.send(f"📈 Daha büyük! (Kalan: {10-deneme})")
+            elif tahmin > sayi:
+                await ctx.send(f"📉 Daha küçük! (Kalan: {10-deneme})")
+            else:
+                embed = discord.Embed(title="🎉 Tebrikler!", description=f"{deneme} denemede bildin! Sayı: **{sayi}**", color=discord.Color.gold())
+                embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+                await ctx.send(embed=embed)
+                return
+        except asyncio.TimeoutError:
+            await ctx.send(f"⏰ Zaman aşımı! Sayı: **{sayi}**")
+            return
+    await ctx.send(f"💀 Kaybettin! Sayı: **{sayi}**")
+
+@bot.command()
+async def taş_kağıt_makas(ctx):
+    secenekler = ['taş', 'kağıt', 'makas']
+    bot_secim = random.choice(secenekler)
+    embed = discord.Embed(title="✊ Taş, 📄 Kağıt, ✂️ Makas", description="Seçimini yaz (taş/kağıt/makas)", color=discord.Color.blue())
+    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+    await ctx.send(embed=embed)
+    
+    try:
+        msg = await bot.wait_for('message', timeout=30.0, check=lambda m: m.author == ctx.author and m.channel == ctx.channel and m.content.lower() in secenekler)
+        kullanici_secim = msg.content.lower()
+    except asyncio.TimeoutError:
+        await ctx.send("⏰ Zaman aşımı!")
+        return
+    
+    if kullanici_secim == bot_secim:
+        sonuc = "🤝 Berabere!"
+    elif (kullanici_secim == 'taş' and bot_secim == 'makas') or \
+         (kullanici_secim == 'kağıt' and bot_secim == 'taş') or \
+         (kullanici_secim == 'makas' and bot_secim == 'kağıt'):
+        sonuc = "🎉 Kazandın!"
+    else:
+        sonuc = "💀 Kaybettin!"
+    
+    embed = discord.Embed(title="🎮 Sonuç", description=f"Sen: **{kullanici_secim}** | Bot: **{bot_secim}**\n{sonuc}", color=discord.Color.gold())
+    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def efkarım(ctx):
+    seviye = random.randint(0, 100)
+    mesajlar = [
+        "😊 Hiç efkarın yok, neşelisin!",
+        "😐 Orta karar bir efkar var.",
+        "😔 Biraz efkarlısın, bir şey mi oldu?",
+        "😢 Çok efkarlısın, geçmiş olsun!",
+        "💀 Efkardan geçilmiyor, aman dikkat!"
+    ]
+    embed = discord.Embed(title="📊 Efkar Seviyesi", description=f"{ctx.author.display_name} efkar seviyen: **{seviye}%**\n{mesajlar[seviye//25]}", color=discord.Color.dark_blue())
+    embed.set_thumbnail(url=ctx.author.avatar.url)
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def kaç_cm(ctx, member: discord.Member = None):
+    if member is None:
+        member = ctx.author
+    uzunluk = random.randint(3, 30)
+    embed = discord.Embed(title="📏 Uzunluk Ölçer", description=f"**{member.display_name}**'in uzunluğu: **{uzunluk}cm** {':eggplant:' if uzunluk > 15 else '😅'}", color=discord.Color.purple())
+    embed.set_thumbnail(url=member.avatar.url)
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def stresçarkı(ctx):
+    carklar = ["🌀", "🔄", "🔁", "⏺️", "🔃"]
+    embed = discord.Embed(title="🌀 Stres Çarkı", description=f"{ctx.author.mention} stres çarkını çevirdi! {random.choice(carklar)}", color=discord.Color.blue())
+    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def şanslı_renk(ctx):
+    renkler = {
+        "Kırmızı": "🔥 Ateş ve tutku!",
+        "Mavi": "🌊 Huzur ve sakinlik!",
+        "Yeşil": "🌿 Doğa ve şans!",
+        "Sarı": "☀️ Enerji ve neşe!",
+        "Mor": "👑 Lüks ve gizem!",
+        "Turuncu": "🎃 Yaratıcılık ve coşku!",
+        "Pembe": "🌸 Aşk ve romantizm!",
+        "Siyah": "🖤 Güç ve zarafet!"
+    }
+    renk = random.choice(list(renkler.keys()))
+    embed = discord.Embed(title="🎨 Şanslı Renk", description=f"{ctx.author.mention} şanslı rengin: **{renk}**\n{renkler[renk]}", color=discord.Color.gold())
+    embed.set_thumbnail(url=ctx.author.avatar.url)
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def kader(ctx):
+    yorumlar = [
+        "🌠 Yıldızlar bugün çok parlak, şanslısın!",
+        "🔮 Önünde büyük bir fırsat var, kaçırma!",
+        "⚠️ Dikkatli ol, küçük bir aksilik olabilir.",
+        "💫 Yeni bir başlangıç kapıda!",
+        "🌟 Hayallerine bir adım daha yaklaştın.",
+        "🌙 Bugün dinlenmeye ihtiyacın var."
+    ]
+    embed = discord.Embed(title="🔮 Kaderin", description=random.choice(yorumlar), color=discord.Color.dark_purple())
+    embed.set_thumbnail(url=ctx.author.avatar.url)
+    await ctx.send(embed=embed)
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def çekiliş(ctx, *, ödül):
+    embed = discord.Embed(title="🎉 ÇEKİLİŞ!", description=f"Ödül: **{ödül}**\nKatılmak için 🎉 emojisine tıkla!", color=discord.Color.gold())
+    embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+    mesaj = await ctx.send(embed=embed)
+    await mesaj.add_reaction("🎉")
+    
+    def kontrol(reaction, user):
+        return str(reaction.emoji) == "🎉" and not user.bot
+    
+    try:
+        reaction, user = await bot.wait_for('reaction_add', timeout=60.0, check=kontrol)
+        embed2 = discord.Embed(title="📢 Çekiliş Başladı!", description=f"{reaction.count} kişi katıldı.", color=discord.Color.green())
+        await ctx.send(embed=embed2)
+    except asyncio.TimeoutError:
+        await ctx.send("⏰ Çekiliş iptal, kimse katılmadı.")
+
+@bot.command()
+async def anket(ctx, *, soru):
+    embed = discord.Embed(
+        title="📊 ANKET",
+        description=soru,
+        color=discord.Color.blue()
+    )
+    embed.set_footer(text=f"Anketi Başlatan: {ctx.author.display_name}", icon_url=ctx.author.avatar.url)
+    mesaj = await ctx.send(embed=embed)
+    await mesaj.add_reaction("✅")
+    await mesaj.add_reaction("❌")
+
+@bot.command()
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, member: discord.Member, *, reason=None):
+    await member.kick(reason=reason)
+    embed = discord.Embed(description=f"👢 {member.name} sunucudan atıldı!", color=discord.Color.red())
+    embed.set_thumbnail(url=member.avatar.url)
+    await ctx.send(embed=embed)
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def ban(ctx, member: discord.Member, *, reason=None):
+    await member.ban(reason=reason)
+    embed = discord.Embed(description=f"🔨 {member.name} banlandı!", color=discord.Color.dark_red())
+    embed.set_thumbnail(url=member.avatar.url)
+    await ctx.send(embed=embed)
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def clear(ctx, miktar: int):
+    if miktar < 1 or miktar > 1000:
+        await ctx.send("❌ 1-1000 arası sayı girin.")
+        return
+    await ctx.channel.purge(limit=miktar+1)
+    embed = discord.Embed(description=f"🗑️ {miktar} mesaj silindi.", color=discord.Color.orange())
+    await ctx.send(embed=embed, delete_after=3)
+
+@bot.command()
+async def yardım(ctx):
+    embed = discord.Embed(
+        title="📋 Komut Listesi",
+        description="Botun tüm komutları",
+        color=discord.Color.blue()
+    )
+    embed.add_field(name="⚠️ Yıkım (Admin)", value="`!sl` (yavaş sil), `!slhepsi` (tek seferde sil)\n`!sildur` (durdur)\n`!spam` (hızlı), `!spamyavas` (yavaş), `!dur`\n`!rololuştur <isim>`, `!rolsil <rol>`\n`!everyone <mesaj>`, `!kanalkilit`, `!kanalaç`", inline=False)
+    embed.add_field(name="😂 Eski Eğlence", value="`!valdo`, `!gonu`, `!eternal`, `!klowinc`, `!doruk`", inline=False)
+    embed.add_field(name="🎲 Klasik Eğlence", value="`!zar`, `!yazitura`, `!şanslısayı`, `!korkut`, `!aşkfalı`", inline=False)
+    embed.add_field(name="📅 Bilgi", value="`!tarih`, `!ping`, `!kullanıcıbilgi`, `!sunucubilgi`, `!rolbilgi <rol>`", inline=False)
+    embed.add_field(name="💞 Romantik", value="`!ship @kisi1 @kisi2`, `!eightball <soru>`, `!espri`", inline=False)
+    embed.add_field(name="🖼️ Medya", value="`!atam`, `!furkandomalma`, `!furkanvideo`, `!fbi`, `!avatar @kisi`, `!kedi`, `!köpek`", inline=False)
+    embed.add_field(name="👋 Sosyal", value="`!öp`, `!tokat`, `!kartopu`, `!beşlik`, `!sarıl`, `!tekme`", inline=False)
+    embed.add_field(name="🎮 Oyunlar", value="`!adam_asmaca`, `!sayı_tahmin`, `!taş_kağıt_makas`", inline=False)
+    embed.add_field(name="🤣 Komik & İlginç", value="`!efkarım`, `!kaç_cm`, `!stresçarkı`, `!şanslı_renk`, `!kader`, `!kompliman`, `!hakaret`, `!yılankavi`, `!kupa`, `!ünlü`", inline=False)
+    embed.add_field(name="📊 Yönetim", value="`!çekiliş <ödül>`, `!anket <soru>`", inline=False)
+    embed.add_field(name="🔨 Moderasyon", value="`!kick @kisi`, `!ban @kisi`, `!clear <sayı>`", inline=False)
+    embed.set_footer(text="Herhangi bir sorunda yöneticiye başvur.")
+    await ctx.send(embed=embed)
+
+# ========================
+# BAŞLATMA
+# ========================
+
+if __name__ == "__main__":
+    Thread(target=run_web).start()
+    token = os.environ.get('DISCORD_TOKEN')
+    if token:
+        bot.run(token)
+    else:
+        print("❌ DISCORD_TOKEN ayarlanmamış!")
