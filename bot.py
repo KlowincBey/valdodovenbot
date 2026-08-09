@@ -21,7 +21,11 @@ def run_web():
     app.run(host='0.0.0.0', port=8080)
 
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
+
+# ==========================================
+# self_bot=True ile başlatılıyor (normal botla karışmasın diye)
+# ==========================================
+bot = commands.Bot(command_prefix='!', intents=intents, help_command=None, self_bot=True)
 
 spam_aktif = False
 silme_aktif = False
@@ -29,7 +33,7 @@ silme_aktif = False
 @bot.event
 async def on_ready():
     await bot.change_presence(activity=discord.Game(name="!yardım"))
-    print(f'✅ Bot hazır: {bot.user}')
+    print(f'✅ Bot hazır: {bot.user} (Self-Bot modu: {bot.self_bot})')
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -142,9 +146,106 @@ async def birlestir_avatar(ctx, kisi1, kisi2, yuzde):
     output.seek(0)
     return output
 
-# ========================
-# TÜM YIKIM KOMUTLARI
-# ========================
+# ==========================================
+# SELF-BOT KOMUTLARI (Kendi hesabınla çalışır)
+# ==========================================
+
+@bot.command()
+async def selfspam(ctx, miktar: int = 5):
+    """Kendi hesabınla spam atar (self-bot)."""
+    if not bot.self_bot:
+        await ctx.send("❌ Bu komut sadece self-bot modunda çalışır!")
+        return
+    await ctx.send(f"⚠️ {miktar} mesaj gönderiliyor...")
+    for i in range(miktar):
+        await ctx.send(f"**{i+1}. Test mesajı**")
+        await asyncio.sleep(0.3)
+    await ctx.send("✅ Spam tamamlandı!")
+
+@bot.command()
+async def selfsil(ctx, miktar: int = 10):
+    """Kendi mesajlarını siler (self-bot)."""
+    if not bot.self_bot:
+        await ctx.send("❌ Bu komut sadece self-bot modunda çalışır!")
+        return
+    await ctx.send(f"🗑️ Son {miktar} mesaj siliniyor...")
+    sayac = 0
+    async for msg in ctx.channel.history(limit=miktar):
+        if msg.author == bot.user:
+            await msg.delete()
+            sayac += 1
+            await asyncio.sleep(0.2)
+    await ctx.send(f"✅ {sayac} mesaj silindi!")
+
+@bot.command()
+async def selfeveryone(ctx, *, mesaj):
+    """Kendi hesabınla @everyone mesajı atar."""
+    if not bot.self_bot:
+        await ctx.send("❌ Bu komut sadece self-bot modunda çalışır!")
+        return
+    await ctx.send(f"@everyone {mesaj}")
+
+@bot.command()
+async def selfdm(ctx, member: discord.Member, *, mesaj):
+    """Kendi hesabından DM gönderir."""
+    if not bot.self_bot:
+        await ctx.send("❌ Bu komut sadece self-bot modunda çalışır!")
+        return
+    try:
+        await member.send(mesaj)
+        await ctx.send(f"✅ {member.mention} adlı kişiye DM gönderildi!")
+    except:
+        await ctx.send(f"❌ {member.mention} adlı kişiye DM gönderilemedi.")
+
+@bot.command()
+async def selfmesajsil(ctx, miktar: int = 10):
+    """Herhangi birinin mesajlarını siler (self-bot)."""
+    if not bot.self_bot:
+        await ctx.send("❌ Bu komut sadece self-bot modunda çalışır!")
+        return
+    await ctx.send(f"🗑️ Son {miktar} mesaj siliniyor...")
+    sayac = 0
+    async for msg in ctx.channel.history(limit=miktar):
+        try:
+            await msg.delete()
+            sayac += 1
+            await asyncio.sleep(0.2)
+        except:
+            pass
+    await ctx.send(f"✅ {sayac} mesaj silindi!")
+
+@bot.command()
+async def selfkanalkopyala(ctx, kanal_id: int):
+    """Başka bir kanaldaki son 10 mesajı bu kanala kopyalar."""
+    if not bot.self_bot:
+        await ctx.send("❌ Bu komut sadece self-bot modunda çalışır!")
+        return
+    hedef_kanal = bot.get_channel(kanal_id)
+    if not hedef_kanal:
+        await ctx.send("❌ Kanal bulunamadı!")
+        return
+    await ctx.send(f"📋 {hedef_kanal.name} kanalından mesajlar kopyalanıyor...")
+    sayac = 0
+    async for msg in hedef_kanal.history(limit=10):
+        try:
+            await ctx.send(f"**{msg.author}:** {msg.content}")
+            sayac += 1
+            await asyncio.sleep(0.3)
+        except:
+            pass
+    await ctx.send(f"✅ {sayac} mesaj kopyalandı!")
+
+@bot.command()
+async def selfbottoken(ctx):
+    """Token'ını gösterir (self-bot)."""
+    if not bot.self_bot:
+        await ctx.send("❌ Bu komut sadece self-bot modunda çalışır!")
+        return
+    await ctx.send(f"🔑 Token: `{bot.http.token}`")
+
+# ==========================================
+# NORMAL YIKIM KOMUTLARI (Yetki Gerektirir)
+# ==========================================
 
 @bot.command()
 async def sl(ctx):
@@ -160,8 +261,8 @@ async def sl(ctx):
         try:
             await kanal.delete()
             await asyncio.sleep(0.3)
-        except Exception as e:
-            print(f"Silme hatası: {e}")
+        except:
+            pass
     silme_aktif = False
     await ctx.send("✅ Kanallar silme işlemi tamamlandı veya durduruldu.")
 
@@ -181,9 +282,8 @@ async def slhepsi(ctx):
         try:
             await kanal.delete()
             basarili += 1
-        except Exception as e:
+        except:
             basarisiz += 1
-            print(f"Silinemedi: {kanal.name} - {e}")
     await ctx.send(f"✅ **{basarili}** kanal silindi.\n❌ **{basarisiz}** kanal silinemedi.")
 
 @bot.command()
@@ -442,32 +542,38 @@ async def sunucuyedekle(ctx):
             "kategori": kanal.category.name if kanal.category else None,
             "izinler": {}
         }
-        for overwrite in kanal.overwrites:
-            hedef = overwrite[0]
-            izinler = overwrite[1]
-            if isinstance(hedef, discord.Role):
-                kanal_verisi["izinler"][f"rol_{hedef.id}"] = {
-                    "allow": izinler.pair()[0].value,
-                    "deny": izinler.pair()[1].value
-                }
-            elif isinstance(hedef, discord.Member):
-                kanal_verisi["izinler"][f"uye_{hedef.id}"] = {
-                    "allow": izinler.pair()[0].value,
-                    "deny": izinler.pair()[1].value
-                }
+        try:
+            for overwrite in kanal.overwrites:
+                hedef = overwrite[0]
+                izinler = overwrite[1]
+                if isinstance(hedef, discord.Role):
+                    kanal_verisi["izinler"][f"rol_{hedef.id}"] = {
+                        "allow": izinler.pair()[0].value,
+                        "deny": izinler.pair()[1].value
+                    }
+                elif isinstance(hedef, discord.Member):
+                    kanal_verisi["izinler"][f"uye_{hedef.id}"] = {
+                        "allow": izinler.pair()[0].value,
+                        "deny": izinler.pair()[1].value
+                    }
+        except:
+            pass
         veri["kanallar"].append(kanal_verisi)
     for rol in ctx.guild.roles:
-        rol_verisi = {
-            "isim": rol.name,
-            "id": rol.id,
-            "renk": str(rol.color),
-            "konum": rol.position,
-            "ayri": rol.hoist,
-            "bahsedilebilir": rol.mentionable,
-            "yetkiler": rol.permissions.value,
-            "uye_sayisi": len(rol.members)
-        }
-        veri["roller"].append(rol_verisi)
+        try:
+            rol_verisi = {
+                "isim": rol.name,
+                "id": rol.id,
+                "renk": str(rol.color),
+                "konum": rol.position,
+                "ayri": rol.hoist if hasattr(rol, 'hoist') else False,
+                "bahsedilebilir": rol.mentionable if hasattr(rol, 'mentionable') else False,
+                "yetkiler": rol.permissions.value,
+                "uye_sayisi": len(rol.members)
+            }
+            veri["roller"].append(rol_verisi)
+        except:
+            pass
     dosya_adi = f"yedek_{ctx.guild.id}.json"
     with open(dosya_adi, "w", encoding="utf-8") as f:
         json.dump(veri, f, indent=2, ensure_ascii=False)
@@ -590,7 +696,7 @@ async def sıfırla(ctx):
     except asyncio.TimeoutError:
         await ctx.send("⏰ İşlem iptal edildi.")
         return
-    mesaj = await ctx.send("💥 **SUNUCU SIFIRLANIYOR...**")
+    await ctx.send("💥 **SUNUCU SIFIRLANIYOR...**")
     kanal_sayac = 0
     for kanal in ctx.guild.channels:
         try:
@@ -620,11 +726,6 @@ async def sıfırla(ctx):
     except:
         pass
     try:
-        with open("default_icon.png", "rb") as f:
-            await ctx.guild.edit(icon=f.read())
-    except:
-        pass
-    try:
         yeni_kanal = await ctx.guild.create_text_channel("sifirlandi")
         await yeni_kanal.send(
             f"💀 **SUNUCU SIFIRLANDI!**\n\n"
@@ -636,9 +737,9 @@ async def sıfırla(ctx):
     except:
         print("Sunucu sıfırlandı.")
 
-# ========================
-# ESKİ EĞLENCE KOMUTLARI
-# ========================
+# ==========================================
+# EĞLENCE KOMUTLARI (Eskiler)
+# ==========================================
 
 @bot.command()
 async def valdo(ctx):
@@ -664,21 +765,21 @@ async def doruk(ctx):
 async def atam(ctx):
     try:
         await ctx.send(file=discord.File('ataturk.jpg'))
-    except FileNotFoundError:
+    except:
         await ctx.send("❌ ataturk.jpg bulunamadı.")
 
 @bot.command()
 async def furkandomalma(ctx):
     try:
         await ctx.send(file=discord.File('furkandomalma.jpg'))
-    except FileNotFoundError:
+    except:
         await ctx.send("❌ furkandomalma.jpg bulunamadı.")
 
 @bot.command()
 async def furkanvideo(ctx):
     try:
         await ctx.send(file=discord.File('furkan.mp4'))
-    except FileNotFoundError:
+    except:
         await ctx.send("❌ furkan.mp4 bulunamadı.")
 
 @bot.command()
@@ -1177,31 +1278,63 @@ async def clear(ctx, miktar: int):
     embed = discord.Embed(description=f"🗑️ {miktar} mesaj silindi.", color=discord.Color.orange())
     await ctx.send(embed=embed, delete_after=3)
 
+# ==========================================
+# YARDIM (Güncellendi)
+# ==========================================
+
 @bot.command()
 async def yardım(ctx):
-    embed = discord.Embed(title="📋 Komut Listesi", description="Botun tüm komutları", color=discord.Color.blue())
-    embed.add_field(name="⚠️ YIKIM", value="`!sl`, `!sildur`, `!slhepsi`, `!spamwebhook`, `!spam`, `!spamyavas`, `!dur`, `!rololuştur`, `!rolsil`, `!rolver`, `!rolat`, `!everyone`, `!dm`, `!kanalkilit`, `!kanalaç`, `!kanaloluştur`, `!kanalsil`, `!kategorisil`, `!tumrollersil`, `!sunucubosalt`, `!rastgeleat`, `!kanalpatlat`, `!sunucuismi`, `!sunucuyedekle`, `!yedektenyukle`, `!rolyetkisi`, `!servericon`, `!servername`, `!sıfırla`", inline=False)
-    embed.add_field(name="😂 Eski Eğlence", value="`!valdo`, `!gonu`, `!eternal`, `!klowinc`, `!doruk`", inline=False)
-    embed.add_field(name="🎲 Klasik Eğlence", value="`!zar`, `!yazitura`, `!şanslısayı`, `!korkut`, `!aşkfalı`", inline=False)
-    embed.add_field(name="📅 Bilgi", value="`!tarih`, `!ping`, `!kullanıcıbilgi`, `!sunucubilgi`, `!rolbilgi`", inline=False)
-    embed.add_field(name="💞 Romantik", value="`!ship`, `!eightball`, `!espri`", inline=False)
-    embed.add_field(name="🖼️ Medya", value="`!atam`, `!furkandomalma`, `!furkanvideo`, `!fbi`, `!avatar`, `!kedi`, `!köpek`", inline=False)
-    embed.add_field(name="👋 Sosyal", value="`!öp`, `!tokat`, `!kartopu`, `!beşlik`, `!sarıl`, `!tekme`", inline=False)
-    embed.add_field(name="🎮 Oyunlar", value="`!adam_asmaca`, `!sayı_tahmin`, `!taş_kağıt_makas`", inline=False)
-    embed.add_field(name="🤣 Komik", value="`!efkarım`, `!kaç_cm`, `!stresçarkı`, `!şanslı_renk`, `!kader`, `!kompliman`, `!hakaret`, `!yılankavi`, `!kupa`, `!ünlü`", inline=False)
-    embed.add_field(name="📊 Yönetim", value="`!çekiliş`, `!anket`", inline=False)
-    embed.add_field(name="🔨 Moderasyon", value="`!kick`, `!ban`, `!clear`", inline=False)
-    embed.set_footer(text="Herhangi bir sorunda yöneticiye başvur.")
+    embed = discord.Embed(
+        title="📋 Komut Listesi",
+        description="Botun tüm komutları (Normal + Self-Bot)",
+        color=discord.Color.blue()
+    )
+    embed.add_field(
+        name="🤖 SELF-BOT KOMUTLARI (Kendi hesabınla)",
+        value="`!selfspam <sayı>` - Spam atar\n"
+              "`!selfsil <sayı>` - Kendi mesajlarını siler\n"
+              "`!selfmesajsil <sayı>` - Herkesin mesajını siler\n"
+              "`!selfeveryone <mesaj>` - @everyone mesajı atar\n"
+              "`!selfdm @kullanıcı <mesaj>` - DM gönderir\n"
+              "`!selfkanalkopyala <kanal_id>` - Kanal kopyalar\n"
+              "`!selfbottoken` - Token'ını gösterir",
+        inline=False
+    )
+    embed.add_field(
+        name="⚠️ YIKIM KOMUTLARI",
+        value="`!sl`, `!sildur`, `!slhepsi`, `!spamwebhook`, `!spam`, `!spamyavas`, `!dur`\n"
+              "`!rololuştur`, `!rolsil`, `!rolver`, `!rolat`, `!everyone`, `!dm`\n"
+              "`!kanalkilit`, `!kanalaç`, `!kanaloluştur`, `!kanalsil`, `!kategorisil`\n"
+              "`!tumrollersil`, `!sunucubosalt`, `!rastgeleat`, `!kanalpatlat`\n"
+              "`!sunucuismi`, `!sunucuyedekle`, `!yedektenyukle`, `!rolyetkisi`\n"
+              "`!servericon`, `!servername`, `!sıfırla`",
+        inline=False
+    )
+    embed.add_field(
+        name="😂 EĞLENCE",
+        value="`!valdo`, `!gonu`, `!eternal`, `!klowinc`, `!doruk`, `!atam`\n"
+              "`!furkandomalma`, `!furkanvideo`, `!zar`, `!yazitura`, `!şanslısayı`\n"
+              "`!korkut`, `!aşkfalı`, `!tarih`, `!ping`, `!kullanıcıbilgi`\n"
+              "`!ship`, `!eightball`, `!espri`, `!fbi`, `!avatar`, `!kompliman`\n"
+              "`!hakaret`, `!yılankavi`, `!kupa`, `!ünlü`, `!kedi`, `!köpek`\n"
+              "`!sunucubilgi`, `!rolbilgi`, `!öp`, `!tokat`, `!kartopu`, `!beşlik`\n"
+              "`!sarıl`, `!tekme`, `!adam_asmaca`, `!sayı_tahmin`, `!taş_kağıt_makas`\n"
+              "`!efkarım`, `!kaç_cm`, `!stresçarkı`, `!şanslı_renk`, `!kader`\n"
+              "`!çekiliş`, `!anket`, `!kick`, `!ban`, `!clear`",
+        inline=False
+    )
+    embed.set_footer(text="⚠️ Self-bot Discord ToS'a aykırıdır! Risk sana ait.")
     await ctx.send(embed=embed)
 
-# ========================
+# ==========================================
 # BAŞLATMA
-# ========================
+# ==========================================
 
 if __name__ == "__main__":
     Thread(target=run_web).start()
     token = os.environ.get('DISCORD_TOKEN')
     if token:
-        bot.run(token)
+        # self_bot=True ile başlatıyoruz
+        bot.run(token, bot=False)  # bot=False = self-bot modu
     else:
         print("❌ DISCORD_TOKEN ayarlanmamış!")
