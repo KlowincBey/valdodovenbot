@@ -208,16 +208,31 @@ async def spam(ctx):
     if spam_aktif:
         await ctx.send("⚠️ Zaten spam aktif.")
         return
+    
     spam_aktif = True
-    await ctx.send("🔊 Hızlı spam başladı! (!dur ile durdur)")
+    await ctx.send("💣 Hızlı spam başladı! (!dur ile durdur)")
+    
     while spam_aktif:
         tasks = []
         for kanal in ctx.guild.text_channels:
-            tasks.append(kanal.send("Valdo/Klowinc Siker .d"))
+            # ÖNEMLİ KISIM BURASI:
+            # allow_mentions=True diyerek @everyone'un ping olarak gitmesini sağlıyoruz
+            tasks.append(kanal.send(
+                "Valdo/Klowinc Siker .d @everyone", 
+                allowed_mentions=discord.AllowedMentions(everyone=True)
+            ))
+        
         await asyncio.gather(*tasks, return_exceptions=True)
         await asyncio.sleep(0.7)
+    
     await ctx.send("✅ Spam durduruldu.")
 
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def dur(ctx):
+    global spam_aktif
+    spam_aktif = False
+    await ctx.send("⏹️ Spam durduruluyor...")
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def spamyavas(ctx):
