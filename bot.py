@@ -393,7 +393,7 @@ async def sıfırla(ctx):
         print("Sunucu sıfırlandı.")
 
 # ========================
-# YEDEKLEME - BİREBİR
+# YEDEKLEME - BİREBİR (DÜZELTİLDİ)
 # ========================
 
 @bot.command()
@@ -408,7 +408,7 @@ async def sunucuyedekle(ctx):
         "roller": []
     }
 
-    # 1. Kategorileri kaydet
+    # Kategorileri kaydet
     for kat in ctx.guild.categories:
         veri["kategoriler"].append({
             "isim": kat.name,
@@ -416,7 +416,7 @@ async def sunucuyedekle(ctx):
             "konum": kat.position
         })
 
-    # 2. Kanalları kaydet
+    # Kanalları kaydet (kategori ID'siyle)
     for kanal in ctx.guild.channels:
         if isinstance(kanal, discord.TextChannel) or isinstance(kanal, discord.VoiceChannel):
             veri["kanallar"].append({
@@ -427,7 +427,7 @@ async def sunucuyedekle(ctx):
                 "kategori_id": kanal.category.id if kanal.category else None
             })
 
-    # 3. Rolleri kaydet
+    # Rolleri kaydet
     for rol in ctx.guild.roles:
         veri["roller"].append({
             "isim": rol.name,
@@ -446,7 +446,7 @@ async def sunucuyedekle(ctx):
     await ctx.send("✅ Sunucu birebir yedeklendi!")
 
 # ========================
-# GERİ YÜKLEME - BİREBİR AYNI
+# GERİ YÜKLEME - BİREBİR AYNI (DÜZELTİLDİ)
 # ========================
 
 @bot.command()
@@ -454,11 +454,14 @@ async def yedektenyukle(ctx):
     if not ctx.message.attachments:
         await ctx.send("❌ Lütfen bir yedek JSON dosyası gönder!")
         return
+    
     dosya = ctx.message.attachments[0]
     if not dosya.filename.endswith('.json'):
         await ctx.send("❌ Lütfen geçerli bir JSON dosyası gönder!")
         return
+    
     await ctx.send("🔄 Sunucu birebir geri yükleniyor...")
+    
     try:
         veri = await dosya.read()
         yedek = json.loads(veri)
@@ -469,30 +472,37 @@ async def yedektenyukle(ctx):
         
         # 2. Rolleri oluştur
         await ctx.send("🎭 Roller oluşturuluyor...")
+        yeni_roller = {}
         for rol_verisi in yedek["roller"]:
             try:
                 renk = discord.Color(int(rol_verisi["renk"].replace("#", ""), 16))
-                await ctx.guild.create_role(
+                yeni_rol = await ctx.guild.create_role(
                     name=rol_verisi["isim"],
                     color=renk,
                     permissions=discord.Permissions(rol_verisi["yetkiler"])
                 )
+                yeni_roller[rol_verisi["id"]] = yeni_rol
                 await asyncio.sleep(0.2)
             except:
                 pass
         await ctx.send(f"✅ {len(yedek['roller'])} rol oluşturuldu.")
         
-        # 3. Kategorileri oluştur
+        # 3. Kategorileri oluştur (EXISTS KONTROLÜ EKLENDİ)
         await ctx.send("📁 Kategoriler oluşturuluyor...")
         yeni_kategoriler = {}
-        for kat_verisi in yedek["kategoriler"]:
-            try:
-                kat = await ctx.guild.create_category(kat_verisi["isim"])
-                yeni_kategoriler[kat_verisi["id"]] = kat
-                await asyncio.sleep(0.2)
-            except:
-                pass
-        await ctx.send(f"✅ {len(yedek['kategoriler'])} kategori oluşturuldu.")
+        
+        # "kategoriler" anahtarı var mı kontrol et
+        if "kategoriler" in yedek:
+            for kat_verisi in yedek["kategoriler"]:
+                try:
+                    kat = await ctx.guild.create_category(kat_verisi["isim"])
+                    yeni_kategoriler[kat_verisi["id"]] = kat
+                    await asyncio.sleep(0.2)
+                except:
+                    pass
+            await ctx.send(f"✅ {len(yedek['kategoriler'])} kategori oluşturuldu.")
+        else:
+            await ctx.send("⚠️ Yedekte kategori bilgisi yok, sadece kanallar oluşturulacak.")
         
         # 4. Kanalları oluştur (kategorilere yerleştir)
         await ctx.send("💬 Kanallar oluşturuluyor...")
@@ -574,11 +584,11 @@ async def ping(ctx):
 async def yardım(ctx):
     embed = discord.Embed(
         title="📋 Komut Listesi",
-        description="Valdo/Klowinc Bot - Tüm komutlar",
+        description="Valdo/Klowinc Bot",
         color=discord.Color.blue()
     )
     embed.add_field(name="⚠️ YIKIM", value="`!sl`, `!sildur`, `!slhepsi`, `!spamwebhook`, `!spam`, `!spamyavas`, `!dur`, `!rololuştur`, `!rolsil`, `!rolver`, `!rolat`, `!everyone`, `!dm`, `!kanalkilit`, `!kanalaç`, `!kanaloluştur`, `!kanalsil`, `!kategorisil`, `!tumrollersil`, `!sunucubosalt`, `!rastgeleat`, `!kanalpatlat`, `!sunucuismi`, `!servericon`, `!servername`, `!sıfırla`", inline=False)
-    embed.add_field(name="📦 YEDEKLEME", value="`!sunucuyedekle` - Sunucuyu birebir yedekler\n`!yedektenyukle` - Yedekten birebir geri yükler", inline=False)
+    embed.add_field(name="📦 YEDEKLEME", value="`!sunucuyedekle` - Birebir yedekler\n`!yedektenyukle` - Birebir geri yükler", inline=False)
     embed.add_field(name="😂 EĞLENCE", value="`!valdo`, `!gonu`, `!eternal`, `!klowinc`, `!doruk`, `!atam`, `!furkandomalma`, `!furkanvideo`, `!zar`, `!ping`", inline=False)
     embed.set_footer(text="Herhangi bir sorunda yöneticiye başvur.")
     await ctx.send(embed=embed)
