@@ -34,22 +34,6 @@ kanal_olusumlari = []
 YASAKLI_KELIMELER = ["aptal", "salak", "manyak", "gerizekalı", "mala", "amk", "sg", "siktir", "orospu", "pezevenk", "göt", "yarrak", "amcık"]
 YASAKLI_LINKLER = ["discord.gg/", "https://", "http://", ".com", ".net", ".org"]
 
-@bot.event
-async def on_ready():
-    await bot.change_presence(activity=discord.Game(name="!yardım"))
-    print(f'✅ Bot hazır: {bot.user}')
-    print(f'🛡️ Guard: {"AKTİF" if GUARD_AKTIF else "KAPALI"}')
-
-@bot.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ Yetkin yetmiyor, otur ağla.")
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Eksik argüman. Doğru kullanım: `{ctx.command.name} {ctx.command.signature}`")
-    else:
-        print(f"Hata: {error}")
-        await ctx.send(f"❌ Hata: {str(error)[:100]}")
-
 # ========================================
 # GUARD FONKSİYONLARI
 # ========================================
@@ -98,6 +82,37 @@ async def link_kontrol(message):
             except:
                 pass
     return False
+
+def yikim_engeli():
+    """Guard açıkken yıkım komutlarını engeller."""
+    async def predicate(ctx):
+        if GUARD_AKTIF:
+            await ctx.send("❌ Guard modu açıkken yıkım komutları kullanılamaz! Önce `!guard off` yap.")
+            return False
+        return True
+    return commands.check(predicate)
+
+# ========================================
+# DISCORD OLAYLARI
+# ========================================
+
+@bot.event
+async def on_ready():
+    await bot.change_presence(activity=discord.Game(name="!yardım"))
+    print(f'✅ Bot hazır: {bot.user}')
+    print(f'🛡️ Guard: {"AKTİF" if GUARD_AKTIF else "KAPALI"}')
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ Yetkin yetmiyor, otur ağla.")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ Eksik argüman. Doğru kullanım: `{ctx.command.name} {ctx.command.signature}`")
+    elif isinstance(error, commands.CheckFailure):
+        await ctx.send("❌ Bu komutu kullanma yetkin yok!")
+    else:
+        print(f"Hata: {error}")
+        await ctx.send(f"❌ Hata: {str(error)[:100]}")
 
 @bot.event
 async def on_message(message):
@@ -161,14 +176,15 @@ async def guard(ctx, durum: str = None):
         embed.add_field(name="Kanal Patlatma", value="✅ 5+ kanal/10sn → Ban")
         embed.add_field(name="Raid Koruması", value="✅ 5+ üye/10sn → Ban")
         embed.add_field(name="Küfür & Link", value="✅ Otomatik sil")
+        embed.add_field(name="⚠️ Yıkım Komutları", value="🚫 Guard açıkken **kullanılamaz**")
         await ctx.send(embed=embed)
         return
     if durum.lower() == "on":
         GUARD_AKTIF = True
-        await ctx.send("🛡️ Guard modu **AKTİF**! Sunucu korunuyor.")
+        await ctx.send("🛡️ Guard modu **AKTİF**! Yıkım komutları devre dışı.")
     elif durum.lower() == "off":
         GUARD_AKTIF = False
-        await ctx.send("🛡️ Guard modu **KAPATILDI**!")
+        await ctx.send("🛡️ Guard modu **KAPATILDI**! Yıkım komutları kullanılabilir.")
     else:
         await ctx.send("❌ `!guard on/off` kullan.")
 
@@ -279,11 +295,12 @@ async def birlestir_avatar(ctx, kisi1, kisi2, yuzde):
     return output
 
 # ========================
-# YIKIM KOMUTLARI
+# YIKIM KOMUTLARI (Guard açıkken çalışmaz)
 # ========================
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def sl(ctx):
     global silme_aktif
     if silme_aktif:
@@ -304,6 +321,7 @@ async def sl(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def sildur(ctx):
     global silme_aktif
     silme_aktif = False
@@ -311,6 +329,7 @@ async def sildur(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def slhepsi(ctx):
     await ctx.send("💥 Tüm kanallar tek seferde siliniyor...")
     kanallar = ctx.guild.channels
@@ -326,6 +345,7 @@ async def slhepsi(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def spamwebhook(ctx):
     global spam_aktif
     if spam_aktif:
@@ -367,6 +387,7 @@ async def spamwebhook(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def spam(ctx):
     global spam_aktif
     if spam_aktif:
@@ -384,6 +405,7 @@ async def spam(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def spamyavas(ctx):
     global spam_aktif
     if spam_aktif:
@@ -404,6 +426,7 @@ async def spamyavas(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def dur(ctx):
     global spam_aktif
     spam_aktif = False
@@ -411,6 +434,7 @@ async def dur(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def roluştur(ctx, *, isim):
     try:
         rol = await ctx.guild.create_role(name=isim)
@@ -420,6 +444,7 @@ async def roluştur(ctx, *, isim):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def rolsil(ctx, rol: discord.Role):
     try:
         await rol.delete()
@@ -429,6 +454,7 @@ async def rolsil(ctx, rol: discord.Role):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def rolver(ctx, member: discord.Member, rol: discord.Role):
     try:
         await member.add_roles(rol)
@@ -438,6 +464,7 @@ async def rolver(ctx, member: discord.Member, rol: discord.Role):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def rolat(ctx, member: discord.Member, rol: discord.Role):
     try:
         await member.remove_roles(rol)
@@ -447,11 +474,13 @@ async def rolat(ctx, member: discord.Member, rol: discord.Role):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def everyone(ctx, *, mesaj):
     await ctx.send(f"@everyone {mesaj}")
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def dm(ctx, member: discord.Member, *, mesaj):
     try:
         await member.send(mesaj)
@@ -461,6 +490,7 @@ async def dm(ctx, member: discord.Member, *, mesaj):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def kanalkilit(ctx):
     for kanal in ctx.guild.text_channels:
         try:
@@ -471,6 +501,7 @@ async def kanalkilit(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def kanalaç(ctx):
     for kanal in ctx.guild.text_channels:
         try:
@@ -481,6 +512,7 @@ async def kanalaç(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def kanaloluştur(ctx, *, isim):
     try:
         await ctx.guild.create_text_channel(isim)
@@ -490,6 +522,7 @@ async def kanaloluştur(ctx, *, isim):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def kanalsil(ctx, kanal: discord.TextChannel):
     try:
         await kanal.delete()
@@ -499,6 +532,7 @@ async def kanalsil(ctx, kanal: discord.TextChannel):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def kategorisil(ctx, kategori_adi: str):
     kategori = discord.utils.get(ctx.guild.categories, name=kategori_adi)
     if not kategori:
@@ -516,6 +550,7 @@ async def kategorisil(ctx, kategori_adi: str):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def tumrollersil(ctx):
     sayac = 0
     for rol in ctx.guild.roles:
@@ -530,6 +565,7 @@ async def tumrollersil(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def sunucubosalt(ctx):
     await ctx.send("💀 Tüm üyeler banlanıyor...")
     sayac = 0
@@ -545,6 +581,7 @@ async def sunucubosalt(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def rastgeleat(ctx, sayi: int = 1):
     uyeler = [uye for uye in ctx.guild.members if not uye.bot and uye != ctx.author]
     if len(uyeler) < sayi:
@@ -562,6 +599,7 @@ async def rastgeleat(ctx, sayi: int = 1):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def kanalpatlat(ctx, sayi: int, *, isim: str = "patlama"):
     sayac = 0
     await ctx.send(f"🔨 {sayi} kanal oluşturuluyor...")
@@ -575,6 +613,7 @@ async def kanalpatlat(ctx, sayi: int, *, isim: str = "patlama"):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def sunucuismi(ctx, *, yeni_isim):
     try:
         await ctx.guild.edit(name=yeni_isim)
@@ -584,6 +623,7 @@ async def sunucuismi(ctx, *, yeni_isim):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def servericon(ctx):
     if not ctx.message.attachments:
         await ctx.send("❌ Lütfen bir resim dosyası gönder!")
@@ -601,6 +641,7 @@ async def servericon(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def servername(ctx, *, yeni_isim):
     try:
         await ctx.guild.edit(name=yeni_isim)
@@ -610,6 +651,7 @@ async def servername(ctx, *, yeni_isim):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def sıfırla(ctx):
     await ctx.send("☢️ **SUNUCU SIFIRLANIYOR!** Bu işlem geri alınamaz.\n\n**Devam etmek için 10 saniye içinde `evet` yazın.**")
     def onay_kontrol(m):
@@ -661,11 +703,12 @@ async def sıfırla(ctx):
         print("Sunucu sıfırlandı.")
 
 # ========================
-# YEDEKLEME KOMUTLARI
+# YEDEKLEME KOMUTLARI (Guard açıkken çalışmaz)
 # ========================
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def sunucuyedekle(ctx):
     await ctx.send("📦 Sunucu yedekleniyor...")
     veri = {
@@ -707,6 +750,7 @@ async def sunucuyedekle(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@yikim_engeli()
 async def yedektenyukle(ctx):
     if not ctx.message.attachments:
         await ctx.send("❌ Lütfen bir yedek JSON dosyası gönder!")
@@ -757,7 +801,7 @@ async def yedektenyukle(ctx):
         await ctx.send(f"❌ Hata: {e}")
 
 # ========================
-# EĞLENCE KOMUTLARI
+# EĞLENCE KOMUTLARI (Herkes kullanabilir, guard engellemez)
 # ========================
 
 @bot.command()
@@ -821,7 +865,7 @@ async def yardım(ctx):
         description="Valdo/Klowinc Bot - Tüm komutlar",
         color=discord.Color.blue()
     )
-    embed.add_field(name="🛡️ GUARD", value="`!guard on/off` - Koruma sistemini aç/kapat", inline=False)
+    embed.add_field(name="🛡️ GUARD", value="`!guard on/off` - Koruma sistemini aç/kapat\nGuard açıkken yıkım komutları **kullanılamaz**", inline=False)
     embed.add_field(name="⚠️ YIKIM", value="`!sl`, `!sildur`, `!slhepsi`, `!spamwebhook`, `!spam`, `!spamyavas`, `!dur`, `!rololuştur`, `!rolsil`, `!rolver`, `!rolat`, `!everyone`, `!dm`, `!kanalkilit`, `!kanalaç`, `!kanaloluştur`, `!kanalsil`, `!kategorisil`, `!tumrollersil`, `!sunucubosalt`, `!rastgeleat`, `!kanalpatlat`, `!sunucuismi`, `!servericon`, `!servername`, `!sıfırla`", inline=False)
     embed.add_field(name="📦 YEDEKLEME", value="`!sunucuyedekle`, `!yedektenyukle`", inline=False)
     embed.add_field(name="😂 EĞLENCE", value="`!valdo`, `!gonu`, `!eternal`, `!klowinc`, `!doruk`, `!atam`, `!furkandomalma`, `!furkanvideo`, `!zar`, `!ping`", inline=False)
