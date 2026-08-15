@@ -1,4 +1,4 @@
-import discord
+imporimport discord
 from discord.ext import commands
 import asyncio
 import os
@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
 from flask import Flask
 from threading import Thread
+from collections import defaultdict
 
 app = Flask(__name__)
 
@@ -27,125 +28,191 @@ spam_aktif = False
 silme_aktif = False
 
 # ========================================
-# GUARD KORUMA SİSTEMİ
+# PROFESYONEL KORUMA SİSTEMİ
 # ========================================
 
 GUARD_AKTIF = False
-GUARD_AYARLAR = {
-    "spam": True,
-    "kufur": True,
-    "link": True,
-    "raid": True,
-    "kanal_patlatma": True
-}
 
-YASAKLI_KELIMELER = [
-    "aptal", "salak", "manyak", "gerizekalı", "mala", "amk", "sg", "siktir",
-    "orospu", "pezevenk", "göt", "yarrak", "amcık"
-]
-
-YASAKLI_LINKLER = [
-    "discord.gg/", "https://", "http://", ".com", ".net", ".org"
-]
-
-kullanici_mesajlari = {}
+# Kullanıcı mesaj takibi (spam için)
+kullanici_mesajlari = defaultdict(list)
 kanal_olusumlari = []
 
+# Çoklu kanal spam takibi (aynı anda farklı kanallara mesaj atan bot/uygulama)
+coklu_kanal_mesajlari = defaultdict(lambda: {"mesaj": "", "kanallar": [], "zaman": None})
+
+# Yasaklı kelimeler
+YASAKLI_KELIMELER = ["aptal", "salak", "manyak", "gerizekalı", "mala", "amk", "sg", "siktir", "orospu", "pezevenk", "göt", "yarrak", "amcık"]
+
+# Yasaklı linkler
+YASAKLI_LINKLER = ["discord.gg/", "https://", "http://", ".com", ".net", ".org"]
+
 # ========================================
-# GUARD OLAYLARI
+# KORUMA FONKSİYONLARI
 # ========================================
 
 async def spam_kontrol(message):
-    if not GUARD_AKTIF or not GUARD_AYARLAR["spam"]:
+    """5 saniyede 5 mesaj atanı 1 dakika susturur."""
+    if not GUARD_AKTIF:
         return False
-    kullanici_id = message.author.id
-    simdi = datetime.now()
-    if kullanici_id not in kullanici_mesajlari:
-        kullanici_mesajlari[kullanici_id] = []
-    kullanici_mesajlari[kullanici_id] = [
-        t for t in kullanici_mesajlari[kullanici_id] 
-        if (simdi - t).seconds < 5
+    
+    user_id = message.author.id
+    now = datetime.now()
+    
+    # Kullanıcının mesaj zamanlarını güncelle
+    if user_id not in kullanici_mesajlari:
+        kullanici_mesajlari[user_id] = []
+    
+    # 5 saniyeden eski mesajları temizle
+    kullanici_mesajlari[user_id] = [
+        t for t in kullanici_mesajlari[user_id] 
+        if (now - t).seconds < 5
     ]
-    kullanici_mesajlari[kullanici_id].append(simdi)
-    if len(kullanici_mesajlari[kullanici_id]) > 5:
-        return True
+    
+    kullanici_mesajlari[user_id].append(now)
+    
+    # 5 saniyede 5 mesaj = spam
+    if len(kullanici_mesajlari[user_id]) > 5:
+        try:
+            await message.delete()
+            await message.author.timeout(timedelta(minutes=1), reason="Spam yaptı!")
+            await message.channel.send(f"⛔ {message.author.mention} spam yaptığın için **1 dakika** susturuldun!", delete_after=5)
+            return True
+        except discord.Forbidden:
+            await message.channel.send(f"❌ {message.author.mention} susturulamadı! Bot yetkilerini kontrol et.")
+        except Exception as e:
+            print(f"Spam hatası: {e}")
+    return False
+
+async def coklu_kanal_spam_kontrol(message):
+    """Aynı anda 3+ kanala aynı mesajı gönderen bot/uygulamayı banlar."""
+    if not GUARD_AKTIF or message.author.bot:
+        return False
+    
+    user_id = message.author.id
+    now = datetime.now()
+    mesaj_ozeti = message.content[:50]  # Mesajın ilk 50 karakteri
+    
+    # Kullanıcının gönderdiği mesajları takip et
+    veri = coklu_kanal_mesajlari[user_id]
+    
+    # 10 saniyeden eski verileri sıfırla
+    if veri["zaman"] and (now - veri["zaman"]).seconds > 10:
+        coklu_kanal_mesajlari[user_id] = {"mesaj": "", "kanallar": [], "zaman": None}
+        veri = coklu_kanal_mesajlari[user_id]
+    
+    # Aynı mesajı farklı bir kanala gönderiyorsa
+    if veri["mesaj"] and veri["mesaj"] == mesaj_ozeti and message.channel.id not in veri["kanallar"]:
+        veri["kanallar"].append(message.channel.id)
+        veri["zaman"] = now
+    else:
+        # Yeni mesaj, sıfırla
+        coklu_kanal_mesajlari[user_id] = {"mesaj": mesaj_ozeti, "kanallar": [message.channel.id], "zaman": now}
+        return False
+    
+    # 3 farklı kanala aynı mesajı gönderdiyse = bot/uygulama
+    if len(veri["kanallar"]) >= 3:
+        try:
+            await message.author.ban(reason="Çoklu kanal spam (bot/uygulama)")
+            await message.channel.send(f"🚨 {message.author.mention} çoklu kanal spam yaptığı için **banlandı**!")
+            return True
+        except:
+            pass
     return False
 
 async def kufur_kontrol(message):
-    if not GUARD_AKTIF or not GUARD_AYARLAR["kufur"]:
+    """Küfür engelleme."""
+    if not GUARD_AKTIF:
         return False
     for kelime in YASAKLI_KELIMELER:
         if kelime in message.content.lower():
-            return True
+            try:
+                await message.delete()
+                await message.channel.send(f"⚠️ {message.author.mention} yasaklı kelime kullandın!", delete_after=3)
+                return True
+            except:
+                pass
     return False
 
 async def link_kontrol(message):
-    if not GUARD_AKTIF or not GUARD_AYARLAR["link"]:
+    """Link engelleme."""
+    if not GUARD_AKTIF:
         return False
     for link in YASAKLI_LINKLER:
         if link in message.content.lower():
-            return True
+            try:
+                await message.delete()
+                await message.channel.send(f"⚠️ {message.author.mention} link paylaşmak yasak!", delete_after=3)
+                return True
+            except:
+                pass
     return False
+
+# ========================================
+# DISCORD OLAYLARI
+# ========================================
 
 @bot.event
 async def on_message(message):
     if message.author.bot:
         return
     
+    # Önce spam kontrolü (en öncelikli)
     if await spam_kontrol(message):
-        try:
-            await message.delete()
-            await message.channel.send(f"⚠️ {message.author.mention} Spam yapma!", delete_after=3)
-            await message.author.timeout(timedelta(minutes=5))
-            return
-        except:
-            pass
+        return
     
+    # Çoklu kanal spam kontrolü (bot/uygulama tespiti)
+    if await coklu_kanal_spam_kontrol(message):
+        return
+    
+    # Küfür kontrolü
     if await kufur_kontrol(message):
-        try:
-            await message.delete()
-            await message.channel.send(f"⚠️ {message.author.mention} Yasaklı kelime kullandın!", delete_after=3)
-            return
-        except:
-            pass
+        return
     
+    # Link kontrolü
     if await link_kontrol(message):
-        try:
-            await message.delete()
-            await message.channel.send(f"⚠️ {message.author.mention} Link paylaşmak yasak!", delete_after=3)
-            return
-        except:
-            pass
+        return
     
     await bot.process_commands(message)
 
 @bot.event
 async def on_guild_channel_create(channel):
-    if not GUARD_AKTIF or not GUARD_AYARLAR["kanal_patlatma"]:
+    """Kanal patlatma koruması - 10 saniyede 5+ kanal oluşturanı banlar."""
+    if not GUARD_AKTIF:
         return
-    simdi = datetime.now()
-    kanal_olusumlari.append(simdi)
-    son_kanallar = [t for t in kanal_olusumlari if (simdi - t).seconds < 10]
-    if len(son_kanallar) > 10:
+    
+    now = datetime.now()
+    kanal_olusumlari.append((now, channel.guild.id))
+    
+    # 10 saniyeden eski olayları temizle
+    kanal_olusumlari[:] = [(t, g) for t, g in kanal_olusumlari if (now - t).seconds < 10]
+    
+    # Son 10 saniyede 5+ kanal oluşumu varsa
+    if len(kanal_olusumlari) >= 5:
         try:
-            await channel.delete()
-            await channel.guild.text_channels[0].send("🚨 **KANAL PATLATMA TESPİT EDİLDİ!** Sunucu kilitlendi!")
-            for kanal in channel.guild.channels:
-                if isinstance(kanal, discord.TextChannel):
-                    await kanal.set_permissions(channel.guild.default_role, send_messages=False)
+            # Son kanalı oluşturan kişiyi bul (audit log)
+            async for entry in channel.guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_create):
+                if entry.target.id == channel.id:
+                    await entry.user.ban(reason="Kanal patlatma koruması")
+                    await channel.guild.text_channels[0].send(f"🚨 {entry.user.mention} kanal patlatma yaptığı için **banlandı**!")
+                    break
         except:
             pass
 
 @bot.event
 async def on_member_join(member):
-    if not GUARD_AKTIF or not GUARD_AYARLAR["raid"]:
+    """Raid koruması - 10 saniyede 5+ üye girişini banlar."""
+    if not GUARD_AKTIF:
         return
-    simdi = datetime.now()
-    son_girisler = [t for t in member.guild.members if (simdi - member.joined_at).seconds < 10]
-    if len(son_girisler) > 5:
+    
+    now = datetime.now()
+    
+    # Son 10 saniyede katılan üyeleri say
+    son_girenler = [m for m in member.guild.members if (now - m.joined_at).seconds < 10]
+    
+    if len(son_girenler) >= 5:
         try:
-            await member.ban(reason="Raid tespit edildi!")
-            await member.guild.text_channels[0].send("🚨 **RAID TESPİT EDİLDİ!** Saldırgan banlandı!")
+            await member.ban(reason="Raid koruması")
+            await member.guild.text_channels[0].send(f"🚨 {member.mention} raid saldırısı nedeniyle **banlandı**!")
         except:
             pass
 
@@ -156,52 +223,30 @@ async def on_member_join(member):
 @bot.command()
 @commands.is_owner()
 async def guard(ctx, durum: str = None):
+    """Guard modunu yönetir. !guard [on/off/ayarlar]"""
     global GUARD_AKTIF
+    
     if durum is None:
         embed = discord.Embed(
             title="🛡️ Guard Modu",
-            description=f"Durum: **{'AKTİF' if GUARD_AKTIF else 'KAPALI'}**",
+            description=f"Durum: **{'🟢 AKTİF' if GUARD_AKTIF else '🔴 KAPALI'}**",
             color=discord.Color.green() if GUARD_AKTIF else discord.Color.red()
         )
-        embed.add_field(name="Spam", value="✅" if GUARD_AYARLAR["spam"] else "❌")
-        embed.add_field(name="Küfür", value="✅" if GUARD_AYARLAR["kufur"] else "❌")
-        embed.add_field(name="Link", value="✅" if GUARD_AYARLAR["link"] else "❌")
-        embed.add_field(name="Raid", value="✅" if GUARD_AYARLAR["raid"] else "❌")
-        embed.add_field(name="Kanal Patlatma", value="✅" if GUARD_AYARLAR["kanal_patlatma"] else "❌")
+        embed.add_field(name="📋 Açıklama", value="Spam, çoklu kanal spam, küfür, link, kanal patlatma ve raid koruması aktif!", inline=False)
         await ctx.send(embed=embed)
         return
     
     if durum.lower() == "on":
         GUARD_AKTIF = True
-        await ctx.send("🛡️ Guard modu **AKTİF**!")
+        await ctx.send("🛡️ Guard modu **AKTİF**! Sunucu tam koruma altında.")
     elif durum.lower() == "off":
         GUARD_AKTIF = False
         await ctx.send("🛡️ Guard modu **KAPATILDI**!")
-    elif durum.lower() == "ayarlar":
-        embed = discord.Embed(title="⚙️ Guard Ayarları", color=discord.Color.blue())
-        embed.add_field(name="Spam", value="`!guard spam on/off`", inline=False)
-        embed.add_field(name="Küfür", value="`!guard kufur on/off`", inline=False)
-        embed.add_field(name="Link", value="`!guard link on/off`", inline=False)
-        embed.add_field(name="Raid", value="`!guard raid on/off`", inline=False)
-        embed.add_field(name="Kanal Patlatma", value="`!guard kanal on/off`", inline=False)
-        await ctx.send(embed=embed)
-    elif durum.lower() in GUARD_AYARLAR:
-        if len(ctx.message.content.split()) < 3:
-            await ctx.send("❌ `on` veya `off` belirt! Örnek: `!guard spam on`")
-            return
-        ozellik = durum.lower()
-        deger = ctx.message.content.split()[2].lower()
-        if deger == "on":
-            GUARD_AYARLAR[ozellik] = True
-            await ctx.send(f"✅ `{ozellik}` koruması AKTİF!")
-        elif deger == "off":
-            GUARD_AYARLAR[ozellik] = False
-            await ctx.send(f"❌ `{ozellik}` koruması KAPATILDI!")
-        else:
-            await ctx.send("❌ `on` veya `off` kullan.")
+    else:
+        await ctx.send("❌ Geçersiz parametre! `!guard on/off` kullan.")
 
 # ========================================
-# YIKIM KOMUTLARI
+# YIKIM KOMUTLARI (TÜMÜ)
 # ========================================
 
 @bot.command()
@@ -741,7 +786,7 @@ async def yardım(ctx):
         description="Valdo/Klowinc Bot",
         color=discord.Color.blue()
     )
-    embed.add_field(name="🛡️ GUARD", value="`!guard on/off`, `!guard ayarlar`, `!guard spam on/off`", inline=False)
+    embed.add_field(name="🛡️ GUARD", value="`!guard on/off`", inline=False)
     embed.add_field(name="⚠️ YIKIM", value="`!sl`, `!sildur`, `!slhepsi`, `!spamwebhook`, `!spam`, `!spamyavas`, `!dur`, `!rololuştur`, `!rolsil`, `!rolver`, `!rolat`, `!everyone`, `!dm`, `!kanalkilit`, `!kanalaç`, `!kanaloluştur`, `!kanalsil`, `!kategorisil`, `!tumrollersil`, `!sunucubosalt`, `!rastgeleat`, `!kanalpatlat`, `!sunucuismi`, `!servericon`, `!servername`, `!sıfırla`", inline=False)
     embed.add_field(name="📦 YEDEKLEME", value="`!sunucuyedekle`, `!yedektenyukle`", inline=False)
     embed.add_field(name="😂 EĞLENCE", value="`!valdo`, `!gonu`, `!eternal`, `!klowinc`, `!doruk`, `!atam`, `!furkandomalma`, `!furkanvideo`, `!zar`, `!ping`", inline=False)
