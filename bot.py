@@ -28,15 +28,33 @@ spam_aktif = False
 silme_aktif = False
 GUARD_AKTIF = False
 
-# Guard için değişkenler
-kullanici_mesajlari = defaultdict(list)
-kanal_olusumlari = []
-YASAKLI_KELIMELER = ["aptal", "salak", "manyak", "gerizekalı", "mala", "amk", "sg", "siktir", "orospu", "pezevenk", "göt", "yarrak", "amcık"]
-YASAKLI_LINKLER = ["discord.gg/", "https://", "http://", ".com", ".net", ".org"]
+# ========================================
+# BLACKLIST SİSTEMİ
+# ========================================
+
+YASAKLI_KULLANICILAR = []  # Buraya ID'leri ekle
+
+async def blacklist_kontrol(ctx):
+    """Blacklist kontrolü."""
+    if ctx.author.id in YASAKLI_KULLANICILAR:
+        await ctx.send("❌ Bu kullanıcı kara listede! Botu kullanamazsın.")
+        return False
+    return True
+
+def blacklist_engeli():
+    """Blacklist kontrolü için decorator."""
+    async def predicate(ctx):
+        return await blacklist_kontrol(ctx)
+    return commands.check(predicate)
 
 # ========================================
 # GUARD FONKSİYONLARI
 # ========================================
+
+kullanici_mesajlari = defaultdict(list)
+kanal_olusumlari = []
+YASAKLI_KELIMELER = ["aptal", "salak", "manyak", "gerizekalı", "mala", "amk", "sg", "siktir", "orospu", "pezevenk", "göt", "yarrak", "amcık"]
+YASAKLI_LINKLER = ["discord.gg/", "https://", "http://", ".com", ".net", ".org"]
 
 async def spam_kontrol(message):
     if not GUARD_AKTIF:
@@ -101,6 +119,7 @@ async def on_ready():
     await bot.change_presence(activity=discord.Game(name="!yardım"))
     print(f'✅ Bot hazır: {bot.user}')
     print(f'🛡️ Guard: {"AKTİF" if GUARD_AKTIF else "KAPALI"}')
+    print(f'🚫 Blacklist: {len(YASAKLI_KULLANICILAR)} kişi')
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -157,6 +176,40 @@ async def on_member_join(member):
             await member.guild.text_channels[0].send(f"🚨 {member.mention} raid saldırısı nedeniyle **banlandı**!")
         except:
             pass
+
+# ========================================
+# BLACKLIST KOMUTLARI
+# ========================================
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def blacklist_ekle(ctx, kullanici_id: int):
+    """Kullanıcıyı kara listeye ekler."""
+    if kullanici_id not in YASAKLI_KULLANICILAR:
+        YASAKLI_KULLANICILAR.append(kullanici_id)
+        await ctx.send(f"✅ {kullanici_id} ID'li kullanıcı kara listeye eklendi!")
+    else:
+        await ctx.send("⚠️ Bu kullanıcı zaten kara listede!")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def blacklist_sil(ctx, kullanici_id: int):
+    """Kullanıcıyı kara listeden siler."""
+    if kullanici_id in YASAKLI_KULLANICILAR:
+        YASAKLI_KULLANICILAR.remove(kullanici_id)
+        await ctx.send(f"✅ {kullanici_id} ID'li kullanıcı kara listeden silindi!")
+    else:
+        await ctx.send("⚠️ Bu kullanıcı kara listede değil!")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def blacklist_liste(ctx):
+    """Kara listedeki kullanıcıları listeler."""
+    if YASAKLI_KULLANICILAR:
+        liste = "\n".join([f"<@{uid}>" for uid in YASAKLI_KULLANICILAR])
+        await ctx.send(f"📋 **Kara Liste:**\n{liste}")
+    else:
+        await ctx.send("📋 Kara liste boş!")
 
 # ========================================
 # GUARD KOMUTU
@@ -294,12 +347,13 @@ async def birlestir_avatar(ctx, kisi1, kisi2, yuzde):
     output.seek(0)
     return output
 
-# ========================
-# YIKIM KOMUTLARI (Guard açıkken çalışmaz)
-# ========================
+# ========================================
+# ESKİ YIKIM KOMUTLARI (Guard + Blacklist kontrollü)
+# ========================================
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def sl(ctx):
     global silme_aktif
@@ -321,6 +375,7 @@ async def sl(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def sildur(ctx):
     global silme_aktif
@@ -329,6 +384,7 @@ async def sildur(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def slhepsi(ctx):
     await ctx.send("💥 Tüm kanallar tek seferde siliniyor...")
@@ -345,6 +401,7 @@ async def slhepsi(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def spamwebhook(ctx):
     global spam_aktif
@@ -387,6 +444,7 @@ async def spamwebhook(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def spam(ctx):
     global spam_aktif
@@ -405,6 +463,7 @@ async def spam(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def spamyavas(ctx):
     global spam_aktif
@@ -426,6 +485,7 @@ async def spamyavas(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def dur(ctx):
     global spam_aktif
@@ -434,6 +494,7 @@ async def dur(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def roluştur(ctx, *, isim):
     try:
@@ -444,6 +505,7 @@ async def roluştur(ctx, *, isim):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def rolsil(ctx, rol: discord.Role):
     try:
@@ -454,6 +516,7 @@ async def rolsil(ctx, rol: discord.Role):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def rolver(ctx, member: discord.Member, rol: discord.Role):
     try:
@@ -464,6 +527,7 @@ async def rolver(ctx, member: discord.Member, rol: discord.Role):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def rolat(ctx, member: discord.Member, rol: discord.Role):
     try:
@@ -474,12 +538,14 @@ async def rolat(ctx, member: discord.Member, rol: discord.Role):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def everyone(ctx, *, mesaj):
     await ctx.send(f"@everyone {mesaj}")
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def dm(ctx, member: discord.Member, *, mesaj):
     try:
@@ -490,6 +556,7 @@ async def dm(ctx, member: discord.Member, *, mesaj):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def kanalkilit(ctx):
     for kanal in ctx.guild.text_channels:
@@ -501,6 +568,7 @@ async def kanalkilit(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def kanalaç(ctx):
     for kanal in ctx.guild.text_channels:
@@ -512,6 +580,7 @@ async def kanalaç(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def kanaloluştur(ctx, *, isim):
     try:
@@ -522,6 +591,7 @@ async def kanaloluştur(ctx, *, isim):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def kanalsil(ctx, kanal: discord.TextChannel):
     try:
@@ -532,6 +602,7 @@ async def kanalsil(ctx, kanal: discord.TextChannel):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def kategorisil(ctx, kategori_adi: str):
     kategori = discord.utils.get(ctx.guild.categories, name=kategori_adi)
@@ -550,6 +621,7 @@ async def kategorisil(ctx, kategori_adi: str):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def tumrollersil(ctx):
     sayac = 0
@@ -565,6 +637,7 @@ async def tumrollersil(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def sunucubosalt(ctx):
     await ctx.send("💀 Tüm üyeler banlanıyor...")
@@ -581,6 +654,7 @@ async def sunucubosalt(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def rastgeleat(ctx, sayi: int = 1):
     uyeler = [uye for uye in ctx.guild.members if not uye.bot and uye != ctx.author]
@@ -599,6 +673,7 @@ async def rastgeleat(ctx, sayi: int = 1):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def kanalpatlat(ctx, sayi: int, *, isim: str = "patlama"):
     sayac = 0
@@ -613,6 +688,7 @@ async def kanalpatlat(ctx, sayi: int, *, isim: str = "patlama"):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def sunucuismi(ctx, *, yeni_isim):
     try:
@@ -623,6 +699,7 @@ async def sunucuismi(ctx, *, yeni_isim):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def servericon(ctx):
     if not ctx.message.attachments:
@@ -641,6 +718,7 @@ async def servericon(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def servername(ctx, *, yeni_isim):
     try:
@@ -651,6 +729,7 @@ async def servername(ctx, *, yeni_isim):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def sıfırla(ctx):
     await ctx.send("☢️ **SUNUCU SIFIRLANIYOR!** Bu işlem geri alınamaz.\n\n**Devam etmek için 10 saniye içinde `evet` yazın.**")
@@ -702,12 +781,13 @@ async def sıfırla(ctx):
     except:
         print("Sunucu sıfırlandı.")
 
-# ========================
-# YEDEKLEME KOMUTLARI (Guard açıkken çalışmaz)
-# ========================
+# ========================================
+# YEDEKLEME KOMUTLARI
+# ========================================
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def sunucuyedekle(ctx):
     await ctx.send("📦 Sunucu yedekleniyor...")
@@ -750,6 +830,7 @@ async def sunucuyedekle(ctx):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
+@blacklist_engeli()
 @yikim_engeli()
 async def yedektenyukle(ctx):
     if not ctx.message.attachments:
@@ -800,9 +881,159 @@ async def yedektenyukle(ctx):
     except Exception as e:
         await ctx.send(f"❌ Hata: {e}")
 
-# ========================
-# EĞLENCE KOMUTLARI (Herkes kullanabilir, guard engellemez)
-# ========================
+# ========================================
+# YENİ YIKIM KOMUTLARI
+# ========================================
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+@blacklist_engeli()
+@yikim_engeli()
+async def rolpatlat(ctx, sayi: int = 50):
+    """Rastgele roller oluşturur."""
+    await ctx.send(f"🎭 {sayi} rol oluşturuluyor...")
+    sayac = 0
+    renkler = [discord.Color.random() for _ in range(sayi)]
+    for i in range(sayi):
+        try:
+            await ctx.guild.create_role(name=f"Rol-{i+1}", color=renkler[i])
+            sayac += 1
+            await asyncio.sleep(0.1)
+        except:
+            pass
+    await ctx.send(f"✅ {sayac} rol oluşturuldu!")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+@blacklist_engeli()
+@yikim_engeli()
+async def rolkaristir(ctx):
+    """Tüm rollerin isimlerini ve renklerini rastgele değiştirir."""
+    await ctx.send("🎨 Roller karıştırılıyor...")
+    sayac = 0
+    for rol in ctx.guild.roles:
+        if rol.name == "@everyone":
+            continue
+        try:
+            yeni_isim = f"Rol-{random.randint(1, 9999)}"
+            yeni_renk = discord.Color.random()
+            await rol.edit(name=yeni_isim, color=yeni_renk)
+            sayac += 1
+            await asyncio.sleep(0.1)
+        except:
+            pass
+    await ctx.send(f"✅ {sayac} rol karıştırıldı!")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+@blacklist_engeli()
+@yikim_engeli()
+async def rol_izin_sifirla(ctx):
+    """Tüm rollerin izinlerini sıfırlar."""
+    await ctx.send("🔓 Rollerin izinleri sıfırlanıyor...")
+    sayac = 0
+    for rol in ctx.guild.roles:
+        if rol.name == "@everyone":
+            continue
+        try:
+            await rol.edit(permissions=discord.Permissions.none())
+            sayac += 1
+            await asyncio.sleep(0.1)
+        except:
+            pass
+    await ctx.send(f"✅ {sayac} rolün izinleri sıfırlandı!")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+@blacklist_engeli()
+@yikim_engeli()
+async def hepsini_sustur(ctx, dakika: int = 5):
+    """Tüm üyeleri belirtilen dakika boyunca susturur."""
+    await ctx.send(f"🔇 Tüm üyeler {dakika} dakika susturuluyor...")
+    sayac = 0
+    for member in ctx.guild.members:
+        if member.bot:
+            continue
+        try:
+            await member.timeout(timedelta(minutes=dakika), reason="Toplu susturma")
+            sayac += 1
+            await asyncio.sleep(0.1)
+        except:
+            pass
+    await ctx.send(f"✅ {sayac} üye {dakika} dakika susturuldu!")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+@blacklist_engeli()
+@yikim_engeli()
+async def emoji_sil(ctx):
+    """Tüm özel emojileri siler."""
+    await ctx.send("😢 Emojiler siliniyor...")
+    sayac = 0
+    for emoji in ctx.guild.emojis:
+        try:
+            await emoji.delete()
+            sayac += 1
+            await asyncio.sleep(0.1)
+        except:
+            pass
+    await ctx.send(f"✅ {sayac} emoji silindi!")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+@blacklist_engeli()
+@yikim_engeli()
+async def webhook_patlat(ctx):
+    """Tüm webhook'ları siler."""
+    await ctx.send("🔗 Webhook'lar siliniyor...")
+    sayac = 0
+    async for webhook in ctx.guild.webhooks():
+        try:
+            await webhook.delete()
+            sayac += 1
+            await asyncio.sleep(0.1)
+        except:
+            pass
+    await ctx.send(f"✅ {sayac} webhook silindi!")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+@blacklist_engeli()
+@yikim_engeli()
+async def kanal_ismi_degistir(ctx):
+    """Tüm kanalların isimlerini rastgele değiştirir."""
+    await ctx.send("📝 Kanal isimleri değiştiriliyor...")
+    sayac = 0
+    for kanal in ctx.guild.channels:
+        try:
+            yeni_isim = f"kanal-{random.randint(1, 9999)}"
+            await kanal.edit(name=yeni_isim)
+            sayac += 1
+            await asyncio.sleep(0.1)
+        except:
+            pass
+    await ctx.send(f"✅ {sayac} kanalın ismi değiştirildi!")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+@blacklist_engeli()
+@yikim_engeli()
+async def kanal_yavas_mod(ctx, saniye: int = 5):
+    """Tüm kanallara yavaş mod açar."""
+    await ctx.send(f"🐢 Tüm kanallara {saniye} saniye yavaş mod açılıyor...")
+    sayac = 0
+    for kanal in ctx.guild.text_channels:
+        try:
+            await kanal.edit(slowmode_delay=saniye)
+            sayac += 1
+            await asyncio.sleep(0.1)
+        except:
+            pass
+    await ctx.send(f"✅ {sayac} kanala yavaş mod açıldı!")
+
+# ========================================
+# EĞLENCE KOMUTLARI (Herkes kullanabilir)
+# ========================================
 
 @bot.command()
 async def valdo(ctx):
@@ -865,16 +1096,18 @@ async def yardım(ctx):
         description="Valdo/Klowinc Bot - Tüm komutlar",
         color=discord.Color.blue()
     )
+    embed.add_field(name="🚫 BLACKLIST", value="`!blacklist_ekle`, `!blacklist_sil`, `!blacklist_liste`", inline=False)
     embed.add_field(name="🛡️ GUARD", value="`!guard on/off` - Koruma sistemini aç/kapat\nGuard açıkken yıkım komutları **kullanılamaz**", inline=False)
-    embed.add_field(name="⚠️ YIKIM", value="`!sl`, `!sildur`, `!slhepsi`, `!spamwebhook`, `!spam`, `!spamyavas`, `!dur`, `!rololuştur`, `!rolsil`, `!rolver`, `!rolat`, `!everyone`, `!dm`, `!kanalkilit`, `!kanalaç`, `!kanaloluştur`, `!kanalsil`, `!kategorisil`, `!tumrollersil`, `!sunucubosalt`, `!rastgeleat`, `!kanalpatlat`, `!sunucuismi`, `!servericon`, `!servername`, `!sıfırla`", inline=False)
+    embed.add_field(name="⚠️ ESKİ YIKIM", value="`!sl`, `!sildur`, `!slhepsi`, `!spamwebhook`, `!spam`, `!spamyavas`, `!dur`, `!rololuştur`, `!rolsil`, `!rolver`, `!rolat`, `!everyone`, `!dm`, `!kanalkilit`, `!kanalaç`, `!kanaloluştur`, `!kanalsil`, `!kategorisil`, `!tumrollersil`, `!sunucubosalt`, `!rastgeleat`, `!kanalpatlat`, `!sunucuismi`, `!servericon`, `!servername`, `!sıfırla`", inline=False)
+    embed.add_field(name="🆕 YENİ YIKIM", value="`!rolpatlat`, `!rolkaristir`, `!rol_izin_sifirla`, `!hepsini_sustur`, `!emoji_sil`, `!webhook_patlat`, `!kanal_ismi_degistir`, `!kanal_yavas_mod`", inline=False)
     embed.add_field(name="📦 YEDEKLEME", value="`!sunucuyedekle`, `!yedektenyukle`", inline=False)
     embed.add_field(name="😂 EĞLENCE", value="`!valdo`, `!gonu`, `!eternal`, `!klowinc`, `!doruk`, `!atam`, `!furkandomalma`, `!furkanvideo`, `!zar`, `!ping`", inline=False)
     embed.set_footer(text="Herhangi bir sorunda yöneticiye başvur.")
     await ctx.send(embed=embed)
 
-# ========================
+# ========================================
 # BAŞLATMA
-# ========================
+# ========================================
 
 if __name__ == "__main__":
     Thread(target=run_web).start()
