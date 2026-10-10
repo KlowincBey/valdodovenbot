@@ -1,41 +1,83 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import asyncio
 import os
 import random
-import aiohttp
-import io
-import json
 import time
+import json
+import sqlite3
 from datetime import datetime, timedelta
-from PIL import Image, ImageDraw, ImageFont
 from flask import Flask
 from threading import Thread
+
+# ========================================
+# FLASK WEB SUNUCUSU
+# ========================================
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot aktif!"
+    return "Sancak RP Botu Aktif!"
 
 def run_web():
     app.run(host='0.0.0.0', port=8080)
 
+# ========================================
+# BOT AYARLARI
+# ========================================
+
 intents = discord.Intents.all()
 intents.message_content = True
+intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
+
+# ========================================
+# ESKİ BOT DEĞİŞKENLERİ
+# ========================================
 
 spam_aktif = False
 silme_aktif = False
 GUARD_AKTIF = False
-
-# Rate limit koruması
 KULLANICI_SON_ISLEM = {}
 SPAM_KONTROL = {}
 
 # ========================================
-# RATE LİMİT KORUMASI
+# YENİ SİSTEM AYARLARI (KENDİNE GÖRE DÜZENLE!)
 # ========================================
+
+TICKET_KATEGORI_ID = 0                          # Ticket kanallarının açılacağı kategori ID
+LOG_KANAL_ID = 0                                # Log kanalı ID
+YETKILI_ROLLER = ["Guard", "/Cmds"]             # IP Ban / Ban / Kick atabilecek roller
+DESTEK_ROLLERI = ["Vise Team"]                  # Ticketları görebilecek roller (ÖRNEK)
+
+# ========================================
+# VERİTABANI
+# ========================================
+
+DB = "sancak_rp.db"
+
+def db_kur():
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS tickets
+                 (kanal_id INTEGER PRIMARY KEY, kullanici_id INTEGER, konu TEXT, durum TEXT, tarih TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS ipbanlar
+                 (user_id INTEGER PRIMARY KEY, sebep TEXT, tarih TEXT)''')
+    conn.commit()
+    conn.close()
+
+db_kur()
+
+# ========================================
+# YARDIMCI FONKSİYONLAR
+# ========================================
+
+def log_yaz(guild, mesaj):
+    kanal = guild.get_channel(LOG_KANAL_ID)
+    if kanal:
+        asyncio.create_task(kanal.send(mesaj))
 
 def rate_limit_kontrol(user_id):
     now = time.time()
@@ -44,10 +86,6 @@ def rate_limit_kontrol(user_id):
             return False
     KULLANICI_SON_ISLEM[user_id] = now
     return True
-
-# ========================================
-# GUARD FONKSİYONLARI
-# ========================================
 
 async def spam_kontrol(message):
     if not GUARD_AKTIF:
@@ -62,6 +100,9 @@ async def spam_kontrol(message):
     SPAM_KONTROL[user_id] = now
     
     if user_id not in KULLANICI_SON_ISLEM:
+        KULLANICI_SON_ISLEM[user_id] = []
+    
+    if not isinstance(KULLANICI_SON_ISLEM[user_id], list):
         KULLANICI_SON_ISLEM[user_id] = []
     
     KULLANICI_SON_ISLEM[user_id] = [t for t in KULLANICI_SON_ISLEM[user_id] if now - t < 5]
@@ -119,8 +160,13 @@ def yikim_engeli():
 
 @bot.event
 async def on_ready():
-    await bot.change_presence(activity=discord.Game(name="!yardım"))
-    print(f'✅ Bot hazır: {bot.user}')
+    await bot.change_presence(activity=discord.Game(name="!yardım | Sancak RP"))
+    print(f'✅ Sancak RP Botu hazır: {bot.user}')
+    try:
+        synced = await bot.tree.sync()
+        print(f"✅ {len(synced)} slash komut senkronize edildi.")
+    except Exception as e:
+        print(f"❌ Sync hatası: {e}")
 
 @bot.event
 async def on_message(message):
@@ -150,7 +196,7 @@ async def on_command_error(ctx, error):
         await ctx.send(f"Hata: {str(error)[:100]}")
 
 # ========================================
-# GUARD KOMUTU
+# GUARD KOMUTU (ESKİ)
 # ========================================
 
 @bot.command()
@@ -169,114 +215,240 @@ async def guard(ctx, durum: str = None):
     else:
         await ctx.send("!guard on veya !guard off yaz.")
 
-def adam_ascii(can):
-    ascii_art = [
-        """
-        +---+
-        |   |
-            |
-            |
-            |
-            |
-        =========
-        """,
-        """
-        +---+
-        |   |
-        O   |
-            |
-            |
-            |
-        =========
-        """,
-        """
-        +---+
-        |   |
-        O   |
-        |   |
-            |
-            |
-        =========
-        """,
-        """
-        +---+
-        |   |
-        O   |
-       /|   |
-            |
-            |
-        =========
-        """,
-        """
-        +---+
-        |   |
-        O   |
-       /|\\  |
-            |
-            |
-        =========
-        """,
-        """
-        +---+
-        |   |
-        O   |
-       /|\\  |
-       /    |
-            |
-        =========
-        """,
-        """
-        +---+
-        |   |
-        O   |
-       /|\\  |
-       / \\  |
-            |
-        =========
-        """
-    ]
-    return ascii_art[6 - can] if 0 <= can <= 6 else ascii_art[0]
+# ========================================
+# TICKET SİSTEMİ (YENİ)
+# ========================================
 
-async def birlestir_avatar(ctx, kisi1, kisi2, yuzde):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(kisi1.avatar.url) as resp1:
-            img1_data = await resp1.read()
-        async with session.get(kisi2.avatar.url) as resp2:
-            img2_data = await resp2.read()
-    
-    img1 = Image.open(io.BytesIO(img1_data)).convert("RGBA")
-    img2 = Image.open(io.BytesIO(img2_data)).convert("RGBA")
-    size = (200, 200)
-    img1 = img1.resize(size, Image.LANCZOS)
-    img2 = img2.resize(size, Image.LANCZOS)
-    canvas = Image.new("RGBA", (500, 300), (30, 30, 30, 255))
-    canvas.paste(img1, (30, 30))
-    canvas.paste(img2, (270, 30))
-    
-    kalp = Image.open("heart.png") if os.path.exists("heart.png") else None
-    if kalp:
-        kalp = kalp.resize((60, 60), Image.LANCZOS)
-        canvas.paste(kalp, (220, 100), kalp)
-    else:
-        draw = ImageDraw.Draw(canvas)
-        draw.text((220, 120), "❤️", fill="red")
-    
-    draw = ImageDraw.Draw(canvas)
-    try:
-        font = ImageFont.truetype("arial.ttf", 20)
-    except:
-        font = ImageFont.load_default()
-    draw.text((30, 250), kisi1.display_name[:12], fill="white", font=font)
-    draw.text((270, 250), kisi2.display_name[:12], fill="white", font=font)
-    draw.text((210, 200), f"{yuzde}%", fill="yellow", font=font)
-    
-    output = io.BytesIO()
-    canvas.save(output, format="PNG")
-    output.seek(0)
-    return output
+class TicketButonlar(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Oyun İçi Destek", style=discord.ButtonStyle.primary, emoji="🎮", custom_id="ticket_oyun")
+    async def oyun(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await ticket_olustur(interaction, "Oyun İçi Destek")
+
+    @discord.ui.button(label="Teknik Destek", style=discord.ButtonStyle.secondary, emoji="🔧", custom_id="ticket_teknik")
+    async def teknik(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await ticket_olustur(interaction, "Teknik Destek")
+
+    @discord.ui.button(label="Donate Bilgi", style=discord.ButtonStyle.success, emoji="🛒", custom_id="ticket_donate")
+    async def donate(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await ticket_olustur(interaction, "Donate Bilgi")
+
+    @discord.ui.button(label="AntiCheat", style=discord.ButtonStyle.danger, emoji="🔨", custom_id="ticket_anticheat")
+    async def anticheat(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await ticket_olustur(interaction, "AntiCheat")
+
+
+async def ticket_olustur(interaction: discord.Interaction, kategori: str):
+    guild = interaction.guild
+    user = interaction.user
+
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute("SELECT kanal_id FROM tickets WHERE kullanici_id = ? AND durum = 'acik'", (user.id,))
+    kayit = c.fetchone()
+    if kayit:
+        kanal = guild.get_channel(kayit[0])
+        if kanal:
+            await interaction.response.send_message(f"❌ Zaten açık bir ticketın var: {kanal.mention}", ephemeral=True)
+            conn.close()
+            return
+
+    kategori_kanal = guild.get_channel(TICKET_KATEGORI_ID)
+
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(read_messages=False),
+        user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+        guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+    }
+    for rol_ismi in DESTEK_ROLLERI:
+        rol = discord.utils.get(guild.roles, name=rol_ismi)
+        if rol:
+            overwrites[rol] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+
+    ticket_sayisi = len([k for k in guild.channels if k.name.startswith("ticket-")]) + 1
+    kanal = await guild.create_text_channel(
+        name=f"ticket-{ticket_sayisi:04d}",
+        category=kategori_kanal,
+        overwrites=overwrites
+    )
+
+    c.execute("INSERT INTO tickets (kanal_id, kullanici_id, konu, durum, tarih) VALUES (?, ?, ?, ?, ?)",
+              (kanal.id, user.id, kategori, "acik", datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+    embed = discord.Embed(
+        title=f"🎫 Destek Talebi #{ticket_sayisi:04d}",
+        description=f"{user.mention} tarafından **{kategori}** kategorisinde oluşturuldu.\n\n"
+                    f"**Destek ID:** #{ticket_sayisi:04d}\n"
+                    f"**Kategori:** {kategori}\n"
+                    f"**Oluşturan:** {user.mention}\n"
+                    f"**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+        color=discord.Color.blue()
+    )
+    embed.set_footer(text="Sancak RP Destek Sistemi")
+
+    view = TicketKontrol()
+    await kanal.send(content=user.mention + " | Yetkililer en kısa sürede ilgilenecektir.", embed=embed, view=view)
+    await interaction.response.send_message(f"✅ Ticketın açıldı: {kanal.mention}", ephemeral=True)
+    log_yaz(guild, f"🎫 **Yeni Ticket:** {kanal.mention} - {user.mention} ({kategori})")
+
+
+class TicketKontrol(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Ticket Claim", style=discord.ButtonStyle.secondary, emoji="🙋", custom_id="ticket_claim")
+    async def claim(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(f"✅ {interaction.user.mention} bu ticketı üstlendi.")
+
+    @discord.ui.button(label="Beklemede", style=discord.ButtonStyle.primary, emoji="⏸️", custom_id="ticket_bekleme")
+    async def bekleme(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(f"⏸️ Ticket **beklemede** olarak işaretlendi.")
+
+    @discord.ui.button(label="İnceleniyor", style=discord.ButtonStyle.primary, emoji="🔍", custom_id="ticket_inceleniyor")
+    async def inceleniyor(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(f"🔍 Ticket **inceleniyor**.")
+
+    @discord.ui.button(label="Çözüldü", style=discord.ButtonStyle.success, emoji="✅", custom_id="ticket_cozuldu")
+    async def cozuldu(self, interaction: discord.Interaction, button: discord.ui.Button):
+        conn = sqlite3.connect(DB)
+        c = conn.cursor()
+        c.execute("UPDATE tickets SET durum = 'kapali' WHERE kanal_id = ?", (interaction.channel.id,))
+        conn.commit()
+        conn.close()
+        await interaction.response.send_message("✅ Ticket çözüldü olarak işaretlendi. Kanal 5 saniye içinde silinecek.")
+        await asyncio.sleep(5)
+        await interaction.channel.delete()
+
+    @discord.ui.button(label="Kapat", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="ticket_kapat")
+    async def kapat(self, interaction: discord.Interaction, button: discord.ui.Button):
+        conn = sqlite3.connect(DB)
+        c = conn.cursor()
+        c.execute("UPDATE tickets SET durum = 'kapali' WHERE kanal_id = ?", (interaction.channel.id,))
+        conn.commit()
+        conn.close()
+        await interaction.response.send_message("🔒 Ticket kapatılıyor...")
+        await asyncio.sleep(3)
+        await interaction.channel.delete()
+
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def ticketkur(ctx):
+    """Ticket panelini kurar."""
+    embed = discord.Embed(
+        title="🎫 Sancak RP Destek Sistemi",
+        description="Bilet oluşturmadan önce aşağıdaki kuralları okuyunuz. Aşağıdaki butonlardan size uygun kategoriyi seçerek destek talebi oluşturabilirsiniz.\n\n"
+                    "**Genel Kurallar:**\n"
+                    "• Biletinizi **24 saat** içerisinde kontrol etmek zorundasınız.\n"
+                    "• Yönetim üyelerine özel mesaj atmaktan kaçının.\n"
+                    "• Sorunlarınızı bilet aracılığıyla iletişim kurun.\n\n"
+                    "**Sorun Bildirimi:**\n"
+                    "• Sorunu detaylı bir şekilde açıklayın.\n"
+                    "• Gerekli bilgileri eksiksiz paylaşın.",
+        color=discord.Color.blue()
+    )
+    embed.set_footer(text="Sancak RP • Destek Sistemi")
+    view = TicketButonlar()
+    await ctx.send(embed=embed, view=view)
 
 # ========================================
-# YIKIM KOMUTLARI
+# IP BAN, BAN, KICK (Sadece Guard ve /Cmds)
+# ========================================
+
+def ipban_yetkisi_var_mi(member: discord.Member) -> bool:
+    for rol in member.roles:
+        if rol.name in YETKILI_ROLLER:
+            return True
+    return False
+
+
+@bot.tree.command(name="ipban", description="Kullanıcıya IP ban atar (Sadece Guard ve /Cmds)")
+@app_commands.describe(kullanici="Banlanacak kullanıcı", sebep="Ban sebebi")
+async def ipban(interaction: discord.Interaction, kullanici: discord.Member, sebep: str = "Sebep belirtilmedi"):
+    if not ipban_yetkisi_var_mi(interaction.user):
+        await interaction.response.send_message("❌ Bu komutu kullanmak için **Guard** veya **/Cmds** rolüne sahip olmalısın!", ephemeral=True)
+        return
+
+    guild = interaction.guild
+    try:
+        await guild.ban(kullanici, reason=f"[IP BAN] {sebep} | Yetkili: {interaction.user}")
+
+        conn = sqlite3.connect(DB)
+        c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO ipbanlar (user_id, sebep, tarih) VALUES (?, ?, ?)",
+                  (kullanici.id, sebep, datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+
+        embed = discord.Embed(
+            title="🚫 IP BAN ATILDI",
+            description=f"**Kullanıcı:** {kullanici.mention} (`{kullanici.id}`)\n"
+                        f"**Sebep:** {sebep}\n"
+                        f"**Yetkili:** {interaction.user.mention}\n"
+                        f"**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+            color=discord.Color.dark_red()
+        )
+        embed.set_footer(text="Sancak RP • IP Ban Sistemi")
+        await interaction.response.send_message(embed=embed)
+        log_yaz(guild, f"🚫 **IP BAN:** {kullanici.mention} - {sebep} | Yetkili: {interaction.user.mention}")
+
+    except discord.Forbidden:
+        await interaction.response.send_message("❌ Bu kullanıcıyı banlayamıyorum (yetkim yetmiyor).", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Hata: {e}", ephemeral=True)
+
+
+@bot.tree.command(name="ban", description="Kullanıcıyı sunucudan banlar")
+@app_commands.describe(kullanici="Banlanacak kullanıcı", sebep="Ban sebebi")
+async def ban(interaction: discord.Interaction, kullanici: discord.Member, sebep: str = "Sebep belirtilmedi"):
+    if not ipban_yetkisi_var_mi(interaction.user):
+        await interaction.response.send_message("❌ Bu komutu kullanmak için **Guard** veya **/Cmds** rolüne sahip olmalısın!", ephemeral=True)
+        return
+
+    guild = interaction.guild
+    try:
+        await guild.ban(kullanici, reason=f"{sebep} | Yetkili: {interaction.user}")
+        embed = discord.Embed(
+            title="🔨 BAN ATILDI",
+            description=f"**Kullanıcı:** {kullanici.mention}\n**Sebep:** {sebep}\n**Yetkili:** {interaction.user.mention}",
+            color=discord.Color.dark_red()
+        )
+        await interaction.response.send_message(embed=embed)
+        log_yaz(guild, f"🔨 **BAN:** {kullanici.mention} - {sebep} | Yetkili: {interaction.user.mention}")
+    except discord.Forbidden:
+        await interaction.response.send_message("❌ Bu kullanıcıyı banlayamıyorum.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Hata: {e}", ephemeral=True)
+
+
+@bot.tree.command(name="kick", description="Kullanıcıyı sunucudan atar")
+@app_commands.describe(kullanici="Atılacak kullanıcı", sebep="Atılma sebebi")
+async def kick(interaction: discord.Interaction, kullanici: discord.Member, sebep: str = "Sebep belirtilmedi"):
+    if not ipban_yetkisi_var_mi(interaction.user):
+        await interaction.response.send_message("❌ Bu komutu kullanmak için **Guard** veya **/Cmds** rolüne sahip olmalısın!", ephemeral=True)
+        return
+
+    guild = interaction.guild
+    try:
+        await kullanici.kick(reason=f"{sebep} | Yetkili: {interaction.user}")
+        embed = discord.Embed(
+            title="👢 KICK ATILDI",
+            description=f"**Kullanıcı:** {kullanici.mention}\n**Sebep:** {sebep}\n**Yetkili:** {interaction.user.mention}",
+            color=discord.Color.orange()
+        )
+        await interaction.response.send_message(embed=embed)
+        log_yaz(guild, f"👢 **KICK:** {kullanici.mention} - {sebep} | Yetkili: {interaction.user.mention}")
+    except discord.Forbidden:
+        await interaction.response.send_message("❌ Bu kullanıcıyı atamıyorum.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Hata: {e}", ephemeral=True)
+
+# ========================================
+# ESKİ YIKIM KOMUTLARI
 # ========================================
 
 @bot.command()
@@ -311,64 +483,6 @@ async def sildur(ctx):
 @bot.command()
 @commands.has_permissions(administrator=True)
 @yikim_engeli()
-async def slhepsi(ctx):
-    await ctx.send("Tüm kanallar tek seferde siliniyor...")
-    kanallar = ctx.guild.channels
-    basarili = 0
-    basarisiz = 0
-    for kanal in kanallar:
-        try:
-            await kanal.delete()
-            basarili += 1
-        except:
-            basarisiz += 1
-    await ctx.send(f"{basarili} kanal silindi. {basarisiz} kanal silinemedi.")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def spamwebhook(ctx):
-    global spam_aktif
-    if spam_aktif:
-        await ctx.send("Spam zaten aktif.")
-        return
-    await ctx.send("Webhook'lar oluşturuluyor...")
-    webhooklar = []
-    for kanal in ctx.guild.text_channels:
-        try:
-            webhook = await kanal.create_webhook(name="SpamBot")
-            webhooklar.append(webhook)
-        except:
-            pass
-    if not webhooklar:
-        await ctx.send("Hiçbir kanala webhook oluşturulamadı.")
-        return
-    spam_aktif = True
-    await ctx.send(f"{len(webhooklar)} webhook ile spam başladı. !dur ile durdur.")
-    sayac = 0
-    while spam_aktif:
-        for i in range(0, len(webhooklar), 5):
-            if not spam_aktif:
-                break
-            grup = webhooklar[i:i+5]
-            tasks = []
-            for webhook in grup:
-                tasks.append(webhook.send("@everyone Valdo/Klowinc Siker .d", username="Valdo/Klowinc"))
-            await asyncio.gather(*tasks, return_exceptions=True)
-            sayac += len(grup)
-            await asyncio.sleep(0.3)
-        if sayac % 50 == 0:
-            await ctx.send(f"{sayac} mesaj gönderildi.")
-    for webhook in webhooklar:
-        try:
-            await webhook.delete()
-        except:
-            pass
-    await ctx.send(f"Spam durduruldu. Toplam {sayac} mesaj gönderildi.")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
 async def spam(ctx):
     global spam_aktif
     if spam_aktif:
@@ -386,26 +500,6 @@ async def spam(ctx):
 @bot.command()
 @commands.has_permissions(administrator=True)
 @yikim_engeli()
-async def spamyavas(ctx):
-    global spam_aktif
-    if spam_aktif:
-        await ctx.send("Spam zaten aktif.")
-        return
-    spam_aktif = True
-    await ctx.send("Yavaş spam başladı. !dur ile durdur.")
-    while spam_aktif:
-        for kanal in ctx.guild.text_channels:
-            if not spam_aktif:
-                break
-            try:
-                await kanal.send("@everyone Valdo/Klowinc Siker .d")
-            except:
-                pass
-        await asyncio.sleep(0.5)
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
 async def dur(ctx):
     global spam_aktif
     spam_aktif = False
@@ -414,234 +508,8 @@ async def dur(ctx):
 @bot.command()
 @commands.has_permissions(administrator=True)
 @yikim_engeli()
-async def roluştur(ctx, *, isim):
-    try:
-        rol = await ctx.guild.create_role(name=isim)
-        await ctx.send(f"{rol.name} adlı rol oluşturuldu.")
-    except Exception as e:
-        await ctx.send(f"Hata: {e}")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def rolsil(ctx, rol: discord.Role):
-    try:
-        await rol.delete()
-        await ctx.send(f"{rol.name} adlı rol silindi.")
-    except Exception as e:
-        await ctx.send(f"Hata: {e}")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def rolver(ctx, member: discord.Member, rol: discord.Role):
-    try:
-        await member.add_roles(rol)
-        await ctx.send(f"{member.mention} adlı kişiye {rol.name} rolü verildi.")
-    except Exception as e:
-        await ctx.send(f"Hata: {e}")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def rolat(ctx, member: discord.Member, rol: discord.Role):
-    try:
-        await member.remove_roles(rol)
-        await ctx.send(f"{member.mention} adlı kişiden {rol.name} rolü alındı.")
-    except Exception as e:
-        await ctx.send(f"Hata: {e}")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def everyone(ctx, *, mesaj):
-    await ctx.send(f"@everyone {mesaj}")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def dm(ctx, member: discord.Member, *, mesaj):
-    try:
-        await member.send(mesaj)
-        await ctx.send(f"{member.mention} adlı kişiye DM gönderildi.")
-    except:
-        await ctx.send(f"{member.mention} adlı kişiye DM gönderilemedi.")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def kanalkilit(ctx):
-    for kanal in ctx.guild.text_channels:
-        try:
-            await kanal.set_permissions(ctx.guild.default_role, send_messages=False)
-        except:
-            pass
-    await ctx.send("Kanallar kilitlendi.")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def kanalaç(ctx):
-    for kanal in ctx.guild.text_channels:
-        try:
-            await kanal.set_permissions(ctx.guild.default_role, send_messages=None)
-        except:
-            pass
-    await ctx.send("Kanallar açıldı.")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def kanaloluştur(ctx, *, isim):
-    try:
-        await ctx.guild.create_text_channel(isim)
-        await ctx.send(f"{isim} adlı kanal oluşturuldu.")
-    except Exception as e:
-        await ctx.send(f"Hata: {e}")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def kanalsil(ctx, kanal: discord.TextChannel):
-    try:
-        await kanal.delete()
-        await ctx.send(f"{kanal.name} adlı kanal silindi.")
-    except Exception as e:
-        await ctx.send(f"Hata: {e}")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def kategorisil(ctx, kategori_adi: str):
-    kategori = discord.utils.get(ctx.guild.categories, name=kategori_adi)
-    if not kategori:
-        await ctx.send("Böyle bir kategori bulunamadı.")
-        return
-    sayac = 0
-    for kanal in kategori.channels:
-        try:
-            await kanal.delete()
-            sayac += 1
-        except:
-            pass
-    await kategori.delete()
-    await ctx.send(f"{kategori_adi} kategorisi ve {sayac} kanal silindi.")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def tumrollersil(ctx):
-    sayac = 0
-    for rol in ctx.guild.roles:
-        if rol.name == "@everyone":
-            continue
-        try:
-            await rol.delete()
-            sayac += 1
-        except:
-            pass
-    await ctx.send(f"{sayac} rol silindi.")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def sunucubosalt(ctx):
-    await ctx.send("Tüm üyeler banlanıyor...")
-    sayac = 0
-    for member in ctx.guild.members:
-        if member == ctx.author or member == ctx.guild.me:
-            continue
-        try:
-            await member.ban(reason="Sunucu boşaltma")
-            sayac += 1
-        except:
-            pass
-    await ctx.send(f"{sayac} üye banlandı.")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def rastgeleat(ctx, sayi: int = 1):
-    uyeler = [uye for uye in ctx.guild.members if not uye.bot and uye != ctx.author]
-    if len(uyeler) < sayi:
-        await ctx.send("Yeterli üye yok.")
-        return
-    secilen = random.sample(uyeler, sayi)
-    sayac = 0
-    for uye in secilen:
-        try:
-            await uye.kick(reason="Rastgele atma")
-            sayac += 1
-        except:
-            pass
-    await ctx.send(f"{sayac} üye atıldı.")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def kanalpatlat(ctx, sayi: int, *, isim: str = "patlama"):
-    await ctx.send(f"{sayi} kanal oluşturuluyor...")
-    sayac = 0
-    for i in range(sayi):
-        try:
-            await ctx.guild.create_text_channel(f"{isim}-{i+1}")
-            sayac += 1
-            await asyncio.sleep(0.2)
-        except:
-            pass
-    await ctx.send(f"{sayac} kanal oluşturuldu.")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def sunucuismi(ctx, *, yeni_isim):
-    try:
-        await ctx.guild.edit(name=yeni_isim)
-        await ctx.send(f"Sunucu ismi {yeni_isim} olarak değiştirildi.")
-    except Exception as e:
-        await ctx.send(f"Hata: {e}")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def servericon(ctx):
-    if not ctx.message.attachments:
-        await ctx.send("Lütfen bir resim dosyası gönder.")
-        return
-    dosya = ctx.message.attachments[0]
-    if not dosya.content_type.startswith('image/'):
-        await ctx.send("Lütfen geçerli bir resim dosyası gönder.")
-        return
-    try:
-        resim = await dosya.read()
-        await ctx.guild.edit(icon=resim)
-        await ctx.send("Sunucu profil fotoğrafı değiştirildi.")
-    except Exception as e:
-        await ctx.send(f"Hata: {e}")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def servername(ctx, *, yeni_isim):
-    try:
-        await ctx.guild.edit(name=yeni_isim)
-        await ctx.send(f"Sunucu ismi {yeni_isim} olarak değiştirildi.")
-    except Exception as e:
-        await ctx.send(f"Hata: {e}")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
 async def sıfırla(ctx):
-    await ctx.send("Sunucu sıfırlanıyor... 10 saniye içinde evet yaz.")
-    def onay_kontrol(m):
-        return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() == "evet"
-    try:
-        await bot.wait_for('message', timeout=10.0, check=onay_kontrol)
-    except asyncio.TimeoutError:
-        await ctx.send("İşlem iptal edildi.")
-        return
-    await ctx.send("SIFIRLANIYOR...")
+    await ctx.send("Sunucu sıfırlanıyor...")
     for kanal in ctx.guild.channels:
         try:
             await kanal.delete()
@@ -661,104 +529,6 @@ async def sıfırla(ctx):
                 pass
     await ctx.guild.edit(name="SIFIRLANDI")
     await ctx.send("Sunucu sıfırlandı.")
-
-# ========================================
-# YEDEKLEME KOMUTLARI
-# ========================================
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def sunucuyedekle(ctx):
-    await ctx.send("Sunucu yedekleniyor...")
-    veri = {
-        "sunucu_ismi": ctx.guild.name,
-        "sunucu_id": ctx.guild.id,
-        "kategoriler": [],
-        "kanallar": [],
-        "roller": []
-    }
-    for kat in ctx.guild.categories:
-        veri["kategoriler"].append({
-            "isim": kat.name,
-            "id": kat.id,
-            "konum": kat.position
-        })
-    for kanal in ctx.guild.channels:
-        if isinstance(kanal, discord.TextChannel) or isinstance(kanal, discord.VoiceChannel):
-            veri["kanallar"].append({
-                "isim": kanal.name,
-                "id": kanal.id,
-                "tip": "text" if isinstance(kanal, discord.TextChannel) else "voice",
-                "konum": kanal.position,
-                "kategori_id": kanal.category.id if kanal.category else None
-            })
-    for rol in ctx.guild.roles:
-        veri["roller"].append({
-            "isim": rol.name,
-            "id": rol.id,
-            "renk": str(rol.color),
-            "konum": rol.position,
-            "yetkiler": rol.permissions.value
-        })
-    dosya_adi = f"yedek_{ctx.guild.id}.json"
-    with open(dosya_adi, "w", encoding="utf-8") as f:
-        json.dump(veri, f, indent=2, ensure_ascii=False)
-    await ctx.send(file=discord.File(dosya_adi))
-    os.remove(dosya_adi)
-    await ctx.send("Sunucu yedeklendi.")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-@yikim_engeli()
-async def yedektenyukle(ctx):
-    if not ctx.message.attachments:
-        await ctx.send("Lütfen bir yedek JSON dosyası gönder.")
-        return
-    dosya = ctx.message.attachments[0]
-    if not dosya.filename.endswith('.json'):
-        await ctx.send("Lütfen geçerli bir JSON dosyası gönder.")
-        return
-    await ctx.send("Sunucu geri yükleniyor...")
-    try:
-        veri = await dosya.read()
-        yedek = json.loads(veri)
-        await ctx.guild.edit(name=yedek["sunucu_ismi"])
-        yeni_roller = {}
-        for rol_verisi in yedek["roller"]:
-            try:
-                renk = discord.Color(int(rol_verisi["renk"].replace("#", ""), 16))
-                yeni_rol = await ctx.guild.create_role(
-                    name=rol_verisi["isim"],
-                    color=renk,
-                    permissions=discord.Permissions(rol_verisi["yetkiler"])
-                )
-                yeni_roller[rol_verisi["id"]] = yeni_rol
-                await asyncio.sleep(0.2)
-            except:
-                pass
-        yeni_kategoriler = {}
-        if "kategoriler" in yedek:
-            for kat_verisi in yedek["kategoriler"]:
-                try:
-                    kat = await ctx.guild.create_category(kat_verisi["isim"])
-                    yeni_kategoriler[kat_verisi["id"]] = kat
-                    await asyncio.sleep(0.2)
-                except:
-                    pass
-        for kanal_verisi in yedek["kanallar"]:
-            try:
-                kategori = yeni_kategoriler.get(kanal_verisi.get("kategori_id"))
-                if kanal_verisi["tip"] == "text":
-                    await ctx.guild.create_text_channel(kanal_verisi["isim"], category=kategori)
-                elif kanal_verisi["tip"] == "voice":
-                    await ctx.guild.create_voice_channel(kanal_verisi["isim"], category=kategori)
-                await asyncio.sleep(0.2)
-            except:
-                pass
-        await ctx.send("Sunucu geri yüklendi.")
-    except Exception as e:
-        await ctx.send(f"Hata: {e}")
 
 # ========================================
 # EĞLENCE KOMUTLARI
@@ -785,79 +555,25 @@ async def doruk(ctx):
     await ctx.send("ARİEL BABAAAA")
 
 @bot.command()
-async def atam(ctx):
-    try:
-        await ctx.send(file=discord.File('ataturk.jpg'))
-    except:
-        await ctx.send("ataturk.jpg bulunamadı.")
-
-@bot.command()
-async def furkandomalma(ctx):
-    try:
-        await ctx.send(file=discord.File('furkandomalma.jpg'))
-    except:
-        await ctx.send("furkandomalma.jpg bulunamadı.")
-
-@bot.command()
-async def furkanvideo(ctx):
-    try:
-        await ctx.send(file=discord.File('furkan.mp4'))
-    except:
-        await ctx.send("furkan.mp4 bulunamadı.")
-
-@bot.command()
-async def zar(ctx):
-    sonuc = random.randint(1, 6)
-    zar_emoji = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
-    await ctx.send(f"Zar: {sonuc} {zar_emoji[sonuc-1]}")
-
-@bot.command()
 async def ping(ctx):
     await ctx.send(f"Pong! {round(bot.latency * 1000)}ms")
 
 @bot.command()
 async def yardım(ctx):
     await ctx.send(
-        "Komutlar:\n"
-        "!guard on/off - Guard'ı aç/kapat\n"
-        "!sl - Kanalları sil\n"
-        "!sildur - Silmeyi durdur\n"
-        "!slhepsi - Tüm kanalları tek seferde sil\n"
-        "!spamwebhook - Webhook ile spam\n"
-        "!spam - Spam başlat\n"
-        "!spamyavas - Yavaş spam\n"
-        "!dur - Spam durdur\n"
-        "!rololuştur <isim> - Rol oluştur\n"
-        "!rolsil <@rol> - Rol sil\n"
-        "!rolver <@kisi> <@rol> - Rol ver\n"
-        "!rolat <@kisi> <@rol> - Rol al\n"
-        "!everyone <mesaj> - @everyone mesajı\n"
-        "!dm <@kisi> <mesaj> - DM gönder\n"
-        "!kanalkilit - Kanalları kilitle\n"
-        "!kanalaç - Kanalları aç\n"
-        "!kanaloluştur <isim> - Kanal oluştur\n"
-        "!kanalsil <#kanal> - Kanal sil\n"
-        "!kategorisil <kategori> - Kategori sil\n"
-        "!tumrollersil - Tüm rolleri sil\n"
-        "!sunucubosalt - Tüm üyeleri banla\n"
-        "!rastgeleat <sayı> - Rastgele üye at\n"
-        "!kanalpatlat <sayı> - Kanal patlat\n"
-        "!sunucuismi <isim> - Sunucu ismini değiştir\n"
-        "!servericon - Sunucu ikonunu değiştir\n"
-        "!servername <isim> - Sunucu ismini değiştir\n"
-        "!sıfırla - Sunucuyu sıfırla\n"
-        "!sunucuyedekle - Sunucuyu yedekle\n"
-        "!yedektenyukle - Yedekten geri yükle\n"
-        "!valdo - Valdo mesajı\n"
-        "!gonu - Gonu mesajı\n"
-        "!eternal - Eternal mesajı\n"
-        "!klowinc - Klowinc mesajı\n"
-        "!doruk - Doruk mesajı\n"
-        "!atam - Atatürk resmi\n"
-        "!furkandomalma - Furkan domalma resmi\n"
-        "!furkanvideo - Furkan video\n"
-        "!zar - Zar at\n"
-        "!ping - Gecikme"
+        "**🎯 Sancak RP Bot Komutları**\n\n"
+        "**🛡️ Guard**\n"
+        "!guard on/off\n\n"
+        "**🎫 Ticket**\n"
+        "!ticketkur - Ticket panelini kurar\n\n"
+        "**🚫 Moderasyon**\n"
+        "/ipban @kisi <sebep> - IP ban\n"
+        "/ban @kisi <sebep> - Ban\n"
+        "/kick @kisi <sebep> - Kick\n\n"
+        "**⚠️ Yıkım**\n"
+        "!sl, !sildur, !spam, !dur, !sıfırla\n\n"
+        "**😂 Eğlence**\n"
+        "!valdo, !gonu, !eternal, !klowinc, !doruk, !ping"
     )
 
 # ========================================
@@ -870,4 +586,4 @@ if __name__ == "__main__":
     if token:
         bot.run(token)
     else:
-        print("❌ DISCORD_TOKEN ayarlanmamış.")
+        print("❌ DISCORD_TOKEN ayarlanmamış!")
