@@ -176,11 +176,11 @@ async def on_message(message):
 async def on_member_join(member):
     try:
         embed = discord.Embed(
-            title="👋 Sunucuya Hoş Geldin!",
+            title="👋 Sancak Roleplay'e Hoş Geldin!",
             description=f"Merhaba **{member.display_name}**,\n\n"
                         f"**{member.guild.name}** sunucumuza hoş geldin!\n\n"
                         f"Rol yapmaya başlamadan önce kayıt olman gerekiyor.\n\n"
-                        f"📝 Kayıt olmak için **#kayıt** kanalına git, "
+                        f"📝 Kayıt olmak için sunucudaki **kayıt kanalına** git, "
                         f"**Kayıt Ol** butonuna tıkla ve formu doldur.\n\n"
                         f"Başvurun onaylandığında sana bir rol verilecek ve rol yapmaya başlayabilirsin.",
             color=discord.Color.blue()
@@ -202,12 +202,12 @@ async def yardim(interaction: discord.Interaction):
         color=discord.Color.blue(),
         timestamp=datetime.now()
     )
-    embed.add_field(name="🎫 Ticket", value="`/ticketkur`", inline=False)
     embed.add_field(name="📝 Kayıt", value="`/kayitkur` `/kayit_ayar`", inline=False)
+    embed.add_field(name="🎫 Ticket", value="`/ticketkur`", inline=False)
     embed.add_field(name="🎭 Rol Sistemi", value="`/rolver` `/rolal` `/toplurol`", inline=False)
     embed.add_field(name="⚖️ Moderasyon", value="`/ban` `/kick` `/ipban` `/uyari` `/uyarilar`", inline=False)
     embed.add_field(name="📊 İstatistik", value="`/profil` `/liderlik` `/gunluk`", inline=False)
-    embed.add_field(name="🎮 RP", value="`/karakter` `/basvuru`", inline=False)
+    embed.add_field(name="🎮 RP", value="`/karakter`", inline=False)
     embed.add_field(name="🎉 Etkinlik", value="`/cekiliş` `/anket` `/duyuru`", inline=False)
     embed.add_field(name="⚙️ Yönetim", value="`/log_kanal` `/ticket_kategori` `/ayarlar`", inline=False)
     embed.set_footer(text="Sancak RP • Destek Sistemi")
@@ -217,7 +217,7 @@ async def yardim(interaction: discord.Interaction):
 # KAYIT SİSTEMİ
 # ========================================
 
-class KayitFormu(discord.ui.Modal, title="Whitelist Başvuru Formu"):
+class KayitFormu(discord.ui.Modal, title="Sancak Roleplay - Whitelist Başvuru Formu"):
     soru1 = discord.ui.TextInput(
         label="1. Adınız, Yaşınız ve Bizi Nereden Buldunuz?",
         style=discord.TextStyle.short,
@@ -260,7 +260,7 @@ class KayitFormu(discord.ui.Modal, title="Whitelist Başvuru Formu"):
             return
 
         embed = discord.Embed(
-            title="📝 Yeni Whitelist Başvurusu",
+            title="📝 Sancak Roleplay - Yeni Whitelist Başvurusu",
             description=f"**Başvuran:** {interaction.user.mention} (`{interaction.user.id}`)\n"
                         f"**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
             color=discord.Color.blue()
@@ -303,7 +303,7 @@ class KayitOnay(discord.ui.View):
                 rol = interaction.guild.get_role(int(rol_id))
                 if rol:
                     await uye.add_roles(rol)
-            await uye.send("🎉 Tebrikler! Kaydınız kabul edildi. İyi rol yapmalar!")
+            await uye.send("🎉 Tebrikler! Sancak Roleplay kaydınız kabul edildi. İyi rol yapmalar!")
         except:
             pass
 
@@ -322,7 +322,7 @@ class KayitOnay(discord.ui.View):
         uye = interaction.guild.get_member(self.kullanici_id)
         try:
             if uye:
-                await uye.send("Üzgünüz, başvurunuz reddedildi. Tekrar deneyebilirsiniz.")
+                await uye.send("Üzgünüz, Sancak Roleplay başvurunuz reddedildi. Tekrar deneyebilirsiniz.")
         except:
             pass
 
@@ -346,7 +346,7 @@ class KayitPaneli(discord.ui.View):
 @app_commands.default_permissions(administrator=True)
 async def kayitkur(interaction: discord.Interaction):
     embed = discord.Embed(
-        title="🎫 TURAN ROLEPLAY KAYIT SİSTEMİ",
+        title="🎫 SANCAK ROLEPLAY KAYIT SİSTEMİ",
         description="**Hoş Geldiniz!**\n\n"
                     "Sunucumuza katılmak ve rol yapmaya başlamak için öncelikle kayıt başvurusunda bulunmanız gerekmektedir.\n\n"
                     "Aşağıdaki buton aracılığıyla başvuru formunu doldurabilirsiniz. "
@@ -438,11 +438,8 @@ async def ticket_ac(interaction: discord.Interaction, kategori: str):
     conn.close()
     
     embed = discord.Embed(
-        title=f"🎫 Destek Talebi #{ticket_sayisi:04d}",
-        description=f"{user.mention} tarafından **{kategori}** kategorisinde oluşturuldu.\n\n"
-                    f"**Kategori:** {kategori}\n"
-                    f"**Oluşturan:** {user.mention}\n"
-                    f"**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+        title=f"🎫 Sancak RP Destek Talebi #{ticket_sayisi:04d}",
+        description=f"{user.mention} tarafından **{kategori}** kategorisinde oluşturuldu.",
         color=discord.Color.blue()
     )
     await kanal.send(content=user.mention, embed=embed, view=TicketKontrol())
@@ -642,7 +639,7 @@ async def liderlik(interaction: discord.Interaction):
         uye = interaction.guild.get_member(uid)
         isim = uye.display_name if uye else f"ID: {uid}"
         mesaj += f"**{i}.** {isim} - {msj} mesaj (Seviye {sv})\n"
-    await interaction.response.send_message(embed=embed_yap("🏆 Liderlik", mesaj, discord.Color.gold()))
+    await interaction.response.send_message(embed=embed_yap("🏆 Sancak RP Liderlik", mesaj, discord.Color.gold()))
 
 
 @bot.tree.command(name="gunluk", description="Günlük ödül alır")
@@ -667,7 +664,7 @@ async def gunluk(interaction: discord.Interaction):
 # RP SİSTEMİ
 # ========================================
 
-@bot.tree.command(name="karakter", description="Karakter kaydı oluşturur")
+@bot.tree.command(name="karakter", description="Sancak RP karakter kaydı oluşturur")
 async def karakter(interaction: discord.Interaction, isim: str, yas: int, meslek: str, hikaye: str):
     conn = db_baglan()
     c = conn.cursor()
@@ -675,7 +672,7 @@ async def karakter(interaction: discord.Interaction, isim: str, yas: int, meslek
               (interaction.user.id, isim, yas, meslek, hikaye))
     conn.commit()
     conn.close()
-    embed = discord.Embed(title="✅ Karakter Kaydedildi", color=discord.Color.green())
+    embed = discord.Embed(title="✅ Sancak RP Karakter Kaydı", color=discord.Color.green())
     embed.add_field(name="İsim", value=isim)
     embed.add_field(name="Yaş", value=yas)
     embed.add_field(name="Meslek", value=meslek)
@@ -690,6 +687,7 @@ async def karakter(interaction: discord.Interaction, isim: str, yas: int, meslek
 @app_commands.default_permissions(administrator=True)
 async def duyuru(interaction: discord.Interaction, baslik: str, mesaj: str):
     embed = discord.Embed(title=f"📢 {baslik}", description=mesaj, color=discord.Color.red())
+    embed.set_footer(text="Sancak RP • Duyuru")
     await interaction.channel.send("@everyone", embed=embed)
     await interaction.response.send_message("✅ Duyuru atıldı.", ephemeral=True)
 
@@ -697,7 +695,7 @@ async def duyuru(interaction: discord.Interaction, baslik: str, mesaj: str):
 @bot.tree.command(name="anket", description="Anket (Admin)")
 @app_commands.default_permissions(administrator=True)
 async def anket(interaction: discord.Interaction, soru: str):
-    embed = discord.Embed(title="📊 ANKET", description=soru, color=discord.Color.blue())
+    embed = discord.Embed(title="📊 Sancak RP Anket", description=soru, color=discord.Color.blue())
     msg = await interaction.channel.send(embed=embed)
     await msg.add_reaction("✅")
     await msg.add_reaction("❌")
@@ -708,7 +706,7 @@ async def anket(interaction: discord.Interaction, soru: str):
 @app_commands.default_permissions(administrator=True)
 async def cekilis(interaction: discord.Interaction, odul: str, sure: int):
     embed = discord.Embed(
-        title="🎉 ÇEKİLİŞ!",
+        title="🎉 SANCAK RP ÇEKİLİŞ!",
         description=f"**Ödül:** {odul}\n**Süre:** {sure} saniye\n🎉 emojisine tıkla!",
         color=discord.Color.gold()
     )
@@ -748,12 +746,28 @@ async def ayarlar(interaction: discord.Interaction):
     ticket_k = ayar_al("ticket_kategori", "Ayarlanmadı")
     kayit_log = ayar_al("kayit_log_kanal", "Ayarlanmadı")
     kayit_rol = ayar_al("kayit_verilecek_rol", "Ayarlanmadı")
-    embed = discord.Embed(title="⚙️ Bot Ayarları", color=discord.Color.blue())
+    embed = discord.Embed(title="⚙️ Sancak RP Bot Ayarları", color=discord.Color.blue())
     embed.add_field(name="Log Kanalı", value=f"<#{log_k}>" if log_k != "Ayarlanmadı" else log_k)
     embed.add_field(name="Ticket Kategorisi", value=f"<#{ticket_k}>" if ticket_k != "Ayarlanmadı" else ticket_k)
     embed.add_field(name="Kayıt Log Kanalı", value=f"<#{kayit_log}>" if kayit_log != "Ayarlanmadı" else kayit_log)
     embed.add_field(name="Kayıt Verilecek Rol", value=f"<@&{kayit_rol}>" if kayit_rol != "Ayarlanmadı" else kayit_rol)
     await interaction.response.send_message(embed=embed)
+
+# ========================================
+# EĞLENCE
+# ========================================
+
+@bot.tree.command(name="zar", description="Zar atar")
+async def zar(interaction: discord.Interaction):
+    await interaction.response.send_message(f"🎲 **{random.randint(1, 6)}**")
+
+@bot.tree.command(name="yazitura", description="Yazı tura")
+async def yazitura(interaction: discord.Interaction):
+    await interaction.response.send_message(f"🪙 **{random.choice(['Yazı', 'Tura'])}**")
+
+@bot.tree.command(name="espri", description="Espri yapar")
+async def espri(interaction: discord.Interaction):
+    await interaction.response.send_message(f"😂 {random.choice(['Sinüsleri var.', 'Antivirüs var.', 'Bug var.'])}")
 
 # ========================================
 # BAŞLATMA
