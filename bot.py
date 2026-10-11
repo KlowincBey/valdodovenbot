@@ -63,9 +63,17 @@ def db_kur():
     c.execute('''CREATE TABLE IF NOT EXISTS karakterler
                  (user_id INTEGER PRIMARY KEY, isim TEXT, yas INTEGER, meslek TEXT, hikaye TEXT, durum TEXT, tarih TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS arac_kayit
-                 (user_id INTEGER PRIMARY KEY, plaka TEXT, marka TEXT, model TEXT, renk TEXT, durum TEXT, tarih TEXT)''')
+                 (user_id INTEGER PRIMARY KEY, plaka TEXT, marka TEXT, model TEXT, renk TEXT, sahiplik TEXT, durum TEXT, tarih TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS is_basvuru
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, is_turu TEXT, icerik TEXT, durum TEXT, tarih TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS ehliyet
+                 (user_id INTEGER PRIMARY KEY, isim TEXT, yas TEXT, ehliyet_turu TEXT, deneyim TEXT, durum TEXT, tarih TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS silah
+                 (user_id INTEGER PRIMARY KEY, isim TEXT, silah_turu TEXT, neden TEXT, gecmis TEXT, durum TEXT, tarih TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS ev
+                 (user_id INTEGER PRIMARY KEY, isim TEXT, ev_adresi TEXT, ev_turu TEXT, fiyat TEXT, durum TEXT, tarih TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS sikayet
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, sikayet_edilen TEXT, sebep TEXT, kanit TEXT, durum TEXT, tarih TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS ayarlar
                  (anahtar TEXT PRIMARY KEY, deger TEXT)''')
     conn.commit()
@@ -101,22 +109,6 @@ def yetkili_mi(member, roller):
 def embed_yap(baslik, aciklama, renk=discord.Color.blue()):
     return discord.Embed(title=baslik, description=aciklama, color=renk, timestamp=datetime.now())
 
-async def log_gonder(guild, tip, kullanici, aciklama):
-    log_kanal_id = ayar_al("log_kanal")
-    if log_kanal_id:
-        kanal = guild.get_channel(int(log_kanal_id))
-        if kanal:
-            embed = discord.Embed(
-                title=f"📝 {tip}",
-                description=f"**Kullanıcı:** {kullanici.mention}\n**Açıklama:** {aciklama}",
-                color=discord.Color.orange(),
-                timestamp=datetime.now()
-            )
-            try:
-                await kanal.send(embed=embed)
-            except:
-                pass
-
 # ========================================
 # HAZIR
 # ========================================
@@ -131,11 +123,14 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Sync hatası: {e}")
 
+# ========================================
+# MESAJ & XP
+# ========================================
+
 @bot.event
 async def on_message(message):
     if message.author.bot:
         return
-    
     conn = db_baglan()
     c = conn.cursor()
     c.execute("INSERT INTO uyeler (user_id, mesaj) VALUES (?, 1) ON CONFLICT(user_id) DO UPDATE SET mesaj = mesaj + 1", (message.author.id,))
@@ -153,7 +148,6 @@ async def on_message(message):
                 pass
     conn.commit()
     conn.close()
-    
     await bot.process_commands(message)
 
 # ========================================
@@ -169,8 +163,7 @@ async def on_member_join(member):
                         f"**{member.guild.name}** sunucumuza hoş geldin!\n\n"
                         f"Rol yapmaya başlamadan önce kayıt olman gerekiyor.\n\n"
                         f"📝 Kayıt olmak için sunucudaki **kayıt kanalına** git, "
-                        f"**Kayıt Ol** butonuna tıkla ve formu doldur.\n\n"
-                        f"Başvurun onaylandığında sana bir rol verilecek ve rol yapmaya başlayabilirsin.",
+                        f"**Kayıt Ol** butonuna tıkla ve formu doldur.",
             color=discord.Color.blue()
         )
         embed.set_footer(text="Sancak Roleplay • Kayıt Sistemi")
@@ -184,27 +177,21 @@ async def on_member_join(member):
 
 @bot.tree.command(name="yardim", description="Sancak RP Botu yardım menüsü")
 async def yardim(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🎯 Sancak RP Botu",
-        description="Kullanılabilir komutlar:",
-        color=discord.Color.blue(),
-        timestamp=datetime.now()
-    )
-    embed.add_field(name="📝 Kayıt", value="`/kayitkur` `/kayit_ayar`", inline=False)
-    embed.add_field(name="🎮 Karakter", value="`/karakterkur` `/karakter_ayar` `/karakter_bilgi`", inline=False)
-    embed.add_field(name="🚗 Araç Kayıt", value="`/arac_kayit` `/arac_bilgi`", inline=False)
-    embed.add_field(name="💼 İş Başvuru", value="`/is_basvuru`", inline=False)
+    embed = discord.Embed(title="🎯 Sancak RP Botu", description="Kullanılabilir komutlar:", color=discord.Color.blue())
+    embed.add_field(name="📝 Kayıt Sistemleri", value="`/kayitkur` `/karakterkur` `/arackur` `/iskur` `/ehliyetkur` `/silahkur` `/evkur` `/sikayetkur`", inline=False)
+    embed.add_field(name="⚙️ Ayar Komutları", value="`/kayit_ayar` `/karakter_ayar` `/arac_ayar` `/is_ayar` `/ehliyet_ayar` `/silah_ayar` `/ev_ayar` `/sikayet_ayar`", inline=False)
     embed.add_field(name="🎫 Ticket", value="`/ticketkur`", inline=False)
     embed.add_field(name="🎭 Rol Sistemi", value="`/rolver` `/rolal` `/toplurol`", inline=False)
-    embed.add_field(name="⚖️ Moderasyon", value="`/ban` `/kick` `/ipban` `/uyari` `/uyarilar`", inline=False)
+    embed.add_field(name="⚖️ Moderasyon", value="`/ban` `/kick` `/ipban` `/unban` `/timeout` `/untimeout` `/uyari` `/uyarilar`", inline=False)
     embed.add_field(name="📊 İstatistik", value="`/profil` `/liderlik` `/gunluk`", inline=False)
     embed.add_field(name="🎉 Etkinlik", value="`/cekiliş` `/anket` `/duyuru`", inline=False)
     embed.add_field(name="⚙️ Yönetim", value="`/log_kanal` `/ticket_kategori` `/ayarlar`", inline=False)
-    embed.set_footer(text="Sancak RP • Destek Sistemi")
+    embed.add_field(name="🎲 Eğlence", value="`/zar` `/yazitura` `/espri`", inline=False)
+    embed.set_footer(text="Sancak Roleplay • Destek Sistemi")
     await interaction.response.send_message(embed=embed)
 
 # ========================================
-# KAYIT SİSTEMİ (Whitelist)
+# 1. WHITELIST KAYIT SİSTEMİ
 # ========================================
 
 class KayitFormu(discord.ui.Modal, title="Sancak Roleplay - Whitelist Başvuru"):
@@ -223,19 +210,15 @@ class KayitFormu(discord.ui.Modal, title="Sancak Roleplay - Whitelist Başvuru")
         if not log_kanal:
             await interaction.response.send_message("❌ Log kanalı bulunamadı!", ephemeral=True)
             return
-
-        embed = discord.Embed(
-            title="📝 Sancak Roleplay - Yeni Whitelist Başvurusu",
-            description=f"**Başvuran:** {interaction.user.mention}\n**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
-            color=discord.Color.blue()
-        )
+        embed = discord.Embed(title="📝 Sancak Roleplay - Whitelist Başvurusu",
+                              description=f"**Başvuran:** {interaction.user.mention}\n**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+                              color=discord.Color.blue())
         embed.add_field(name="1. Ad, Yaş, Kaynak", value=self.soru1.value[:1024], inline=False)
         embed.add_field(name="2. Meta Gaming & Fail RP", value=self.soru2.value[:1024], inline=False)
         embed.add_field(name="3. IC & OOC", value=self.soru3.value[:1024], inline=False)
         embed.add_field(name="4. VDM & RDM", value=self.soru4.value[:1024], inline=False)
         embed.add_field(name="5. Örnek Kaza Rolü", value=self.soru5.value[:1024], inline=False)
         embed.set_footer(text="Sancak Roleplay • Whitelist")
-
         view = KayitOnay(interaction.user.id)
         await log_kanal.send(embed=embed, view=view)
         await interaction.response.send_message("✅ Başvurunuz alındı! Sonuç DM'den bildirilecek.", ephemeral=True)
@@ -247,7 +230,7 @@ class KayitOnay(discord.ui.View):
         self.kullanici_id = kullanici_id
 
     @discord.ui.button(label="Onayla", style=discord.ButtonStyle.success, emoji="✅")
-    async def onayla(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def onayla(self, interaction, button):
         if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
             await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
             return
@@ -271,7 +254,7 @@ class KayitOnay(discord.ui.View):
         await interaction.response.send_message(f"✅ {uye.mention} onaylandı.", ephemeral=True)
 
     @discord.ui.button(label="Reddet", style=discord.ButtonStyle.danger, emoji="❌")
-    async def reddet(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def reddet(self, interaction, button):
         if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
             await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
             return
@@ -293,35 +276,30 @@ class KayitPaneli(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="Kayıt Ol", style=discord.ButtonStyle.primary, emoji="➕", custom_id="kayit_ol")
-    async def kayit_ol(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def kayit_ol(self, interaction, button):
         await interaction.response.send_modal(KayitFormu())
 
 
 @bot.tree.command(name="kayitkur", description="Kayıt panelini kurar")
 @app_commands.default_permissions(administrator=True)
-async def kayitkur(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🎫 SANCAK ROLEPLAY KAYIT SİSTEMİ",
-        description="**Hoş Geldiniz!**\n\n"
-                    "Sunucumuza katılmak ve rol yapmaya başlamak için öncelikle kayıt başvurusunda bulunmanız gerekmektedir.\n\n"
-                    "Aşağıdaki buton aracılığıyla başvuru formunu doldurabilirsiniz.\n\n"
-                    "⚠️ **Unutmayın:** Lütfen formu doldururken kurallarımızı ve temel rol yapma terimlerini bildiğinizden emin olun.",
-        color=discord.Color.blue()
-    )
-    embed.set_footer(text="Sancak Roleplay • Whitelist Sistemi")
+async def kayitkur(interaction):
+    embed = discord.Embed(title="🎫 SANCAK ROLEPLAY KAYIT SİSTEMİ",
+                          description="**Hoş Geldiniz!**\n\nSunucumuza katılmak için kayıt olmanız gerekmektedir.\n\nAşağıdaki butona tıklayarak formu doldurun.",
+                          color=discord.Color.blue())
+    embed.set_footer(text="Sancak Roleplay • Whitelist")
     await interaction.channel.send(embed=embed, view=KayitPaneli())
     await interaction.response.send_message("✅ Kayıt paneli kuruldu.", ephemeral=True)
 
 
-@bot.tree.command(name="kayit_ayar", description="Kayıt sistemini ayarlar (Admin)")
+@bot.tree.command(name="kayit_ayar", description="Kayıt sistemini ayarlar")
 @app_commands.default_permissions(administrator=True)
-async def kayit_ayar(interaction: discord.Interaction, log_kanal: discord.TextChannel, verilecek_rol: discord.Role):
+async def kayit_ayar(interaction, log_kanal: discord.TextChannel, verilecek_rol: discord.Role):
     ayar_koy("kayit_log_kanal", log_kanal.id)
     ayar_koy("kayit_verilecek_rol", verilecek_rol.id)
-    await interaction.response.send_message(f"✅ Kayıt sistemi ayarlandı.\nLog: {log_kanal.mention}\nRol: {verilecek_rol.mention}", ephemeral=True)
+    await interaction.response.send_message(f"✅ Kayıt sistemi ayarlandı.", ephemeral=True)
 
 # ========================================
-# KARAKTER KAYIT SİSTEMİ
+# 2. KARAKTER KAYIT SİSTEMİ
 # ========================================
 
 class KarakterFormu(discord.ui.Modal, title="Sancak Roleplay - Karakter Kayıt"):
@@ -330,7 +308,7 @@ class KarakterFormu(discord.ui.Modal, title="Sancak Roleplay - Karakter Kayıt")
     meslek = discord.ui.TextInput(label="Karakter Mesleği", style=discord.TextStyle.short, required=True)
     hikaye = discord.ui.TextInput(label="Karakter Hikayesi", style=discord.TextStyle.paragraph, required=True)
 
-    async def on_submit(self, interaction: discord.Interaction):
+    async def on_submit(self, interaction):
         log_kanal_id = ayar_al("karakter_log_kanal")
         if not log_kanal_id:
             await interaction.response.send_message("❌ Karakter log kanalı ayarlanmamış!", ephemeral=True)
@@ -339,28 +317,23 @@ class KarakterFormu(discord.ui.Modal, title="Sancak Roleplay - Karakter Kayıt")
         if not log_kanal:
             await interaction.response.send_message("❌ Log kanalı bulunamadı!", ephemeral=True)
             return
-
         conn = db_baglan()
         c = conn.cursor()
         c.execute("INSERT OR REPLACE INTO karakterler (user_id, isim, yas, meslek, hikaye, durum, tarih) VALUES (?, ?, ?, ?, ?, ?, ?)",
                   (interaction.user.id, self.isim.value, int(self.yas.value) if self.yas.value.isdigit() else 0, self.meslek.value, self.hikaye.value, "beklemede", datetime.now().isoformat()))
         conn.commit()
         conn.close()
-
-        embed = discord.Embed(
-            title="📝 Sancak Roleplay - Yeni Karakter Kaydı",
-            description=f"**Başvuran:** {interaction.user.mention}\n**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
-            color=discord.Color.purple()
-        )
+        embed = discord.Embed(title="📝 Sancak Roleplay - Karakter Kaydı",
+                              description=f"**Başvuran:** {interaction.user.mention}\n**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+                              color=discord.Color.purple())
         embed.add_field(name="İsim", value=self.isim.value[:1024], inline=False)
         embed.add_field(name="Yaş", value=self.yas.value, inline=True)
         embed.add_field(name="Meslek", value=self.meslek.value[:1024], inline=True)
         embed.add_field(name="Hikaye", value=self.hikaye.value[:1024], inline=False)
         embed.set_footer(text="Sancak Roleplay • Karakter Kayıt")
-
         view = KarakterOnay(interaction.user.id)
         await log_kanal.send(embed=embed, view=view)
-        await interaction.response.send_message("✅ Karakter başvurunuz alındı! Onaylandığında DM'den bilgilendirileceksiniz.", ephemeral=True)
+        await interaction.response.send_message("✅ Karakter başvurunuz alındı!", ephemeral=True)
 
 
 class KarakterOnay(discord.ui.View):
@@ -369,7 +342,7 @@ class KarakterOnay(discord.ui.View):
         self.kullanici_id = kullanici_id
 
     @discord.ui.button(label="Onayla", style=discord.ButtonStyle.success, emoji="✅")
-    async def onayla(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def onayla(self, interaction, button):
         if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
             await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
             return
@@ -381,7 +354,7 @@ class KarakterOnay(discord.ui.View):
         uye = interaction.guild.get_member(self.kullanici_id)
         try:
             if uye:
-                await uye.send("🎉 Karakter kaydınız onaylandı! İyi rol yapmalar.")
+                await uye.send("🎉 Karakter kaydınız onaylandı!")
         except:
             pass
         embed = interaction.message.embeds[0]
@@ -391,7 +364,7 @@ class KarakterOnay(discord.ui.View):
         await interaction.response.send_message("✅ Karakter onaylandı.", ephemeral=True)
 
     @discord.ui.button(label="Reddet", style=discord.ButtonStyle.danger, emoji="❌")
-    async def reddet(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def reddet(self, interaction, button):
         if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
             await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
             return
@@ -418,35 +391,30 @@ class KarakterPaneli(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="Karakter Kaydı Yap", style=discord.ButtonStyle.primary, emoji="📝", custom_id="karakter_kayit")
-    async def kayit(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def kayit(self, interaction, button):
         await interaction.response.send_modal(KarakterFormu())
 
 
 @bot.tree.command(name="karakterkur", description="Karakter kayıt panelini kurar")
 @app_commands.default_permissions(administrator=True)
-async def karakterkur(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🎮 SANCAK ROLEPLAY KARAKTER KAYIT SİSTEMİ",
-        description="**Karakter Kaydı**\n\n"
-                    "Rol yapmaya başlamadan önce karakter kaydınızı oluşturmanız gerekmektedir.\n\n"
-                    "Aşağıdaki butona tıklayarak formu doldurabilirsiniz. "
-                    "Başvurunuz yetkili ekibimiz tarafından incelenecek ve sonuç DM'den bildirilecektir.",
-        color=discord.Color.purple()
-    )
+async def karakterkur(interaction):
+    embed = discord.Embed(title="🎮 SANCAK ROLEPLAY KARAKTER KAYIT",
+                          description="**Karakter Kaydı**\n\nRol yapmaya başlamadan önce karakter kaydınızı oluşturun.",
+                          color=discord.Color.purple())
     embed.set_footer(text="Sancak Roleplay • Karakter Kayıt")
     await interaction.channel.send(embed=embed, view=KarakterPaneli())
     await interaction.response.send_message("✅ Karakter paneli kuruldu.", ephemeral=True)
 
 
-@bot.tree.command(name="karakter_ayar", description="Karakter sistemini ayarlar (Admin)")
+@bot.tree.command(name="karakter_ayar", description="Karakter sistemini ayarlar")
 @app_commands.default_permissions(administrator=True)
-async def karakter_ayar(interaction: discord.Interaction, log_kanal: discord.TextChannel):
+async def karakter_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("karakter_log_kanal", log_kanal.id)
-    await interaction.response.send_message(f"✅ Karakter log kanalı {log_kanal.mention} olarak ayarlandı.", ephemeral=True)
+    await interaction.response.send_message(f"✅ Karakter log kanalı ayarlandı.", ephemeral=True)
 
 
 @bot.tree.command(name="karakter_bilgi", description="Karakter bilgilerini gösterir")
-async def karakter_bilgi(interaction: discord.Interaction, kullanici: discord.Member = None):
+async def karakter_bilgi(interaction, kullanici: discord.Member = None):
     if kullanici is None:
         kullanici = interaction.user
     conn = db_baglan()
@@ -458,7 +426,7 @@ async def karakter_bilgi(interaction: discord.Interaction, kullanici: discord.Me
         await interaction.response.send_message(f"{kullanici.mention} karakter kaydı yok.", ephemeral=True)
         return
     isim, yas, meslek, hikaye, durum = kayit
-    embed = discord.Embed(title=f"🎮 {kullanici.display_name} Karakter Bilgisi", color=discord.Color.purple())
+    embed = discord.Embed(title=f"🎮 {kullanici.display_name} Karakter", color=discord.Color.purple())
     embed.add_field(name="İsim", value=isim)
     embed.add_field(name="Yaş", value=yas)
     embed.add_field(name="Meslek", value=meslek)
@@ -467,56 +435,623 @@ async def karakter_bilgi(interaction: discord.Interaction, kullanici: discord.Me
     await interaction.response.send_message(embed=embed)
 
 # ========================================
-# ARAÇ KAYIT SİSTEMİ
+# 3. ARAÇ KAYIT SİSTEMİ
 # ========================================
 
-@bot.tree.command(name="arac_kayit", description="Araç kaydı yapar")
-async def arac_kayit(interaction: discord.Interaction, plaka: str, marka: str, model: str, renk: str):
-    conn = db_baglan()
-    c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO arac_kayit (user_id, plaka, marka, model, renk, durum, tarih) VALUES (?, ?, ?, ?, ?, ?, ?)",
-              (interaction.user.id, plaka, marka, model, renk, "aktif", datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-    await interaction.response.send_message(f"✅ Araç kaydedildi: **{plaka}** {marka} {model} ({renk})", ephemeral=True)
+class AracFormu(discord.ui.Modal, title="Sancak Roleplay - Araç Kayıt"):
+    plaka = discord.ui.TextInput(label="Araç Plakası", style=discord.TextStyle.short, required=True)
+    marka = discord.ui.TextInput(label="Araç Markası", style=discord.TextStyle.short, required=True)
+    model = discord.ui.TextInput(label="Araç Modeli", style=discord.TextStyle.short, required=True)
+    renk = discord.ui.TextInput(label="Araç Rengi", style=discord.TextStyle.short, required=True)
+    sahiplik = discord.ui.TextInput(label="Aracın Size Ait Olduğunu Belirtin", style=discord.TextStyle.paragraph, required=True)
+
+    async def on_submit(self, interaction):
+        log_kanal_id = ayar_al("arac_log_kanal")
+        if not log_kanal_id:
+            await interaction.response.send_message("❌ Araç log kanalı ayarlanmamış!", ephemeral=True)
+            return
+        log_kanal = interaction.guild.get_channel(int(log_kanal_id))
+        if not log_kanal:
+            await interaction.response.send_message("❌ Log kanalı bulunamadı!", ephemeral=True)
+            return
+        conn = db_baglan()
+        c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO arac_kayit (user_id, plaka, marka, model, renk, sahiplik, durum, tarih) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                  (interaction.user.id, self.plaka.value, self.marka.value, self.model.value, self.renk.value, self.sahiplik.value, "beklemede", datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        embed = discord.Embed(title="🚗 Sancak Roleplay - Araç Kaydı",
+                              description=f"**Başvuran:** {interaction.user.mention}\n**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+                              color=discord.Color.dark_blue())
+        embed.add_field(name="Plaka", value=self.plaka.value, inline=True)
+        embed.add_field(name="Marka", value=self.marka.value, inline=True)
+        embed.add_field(name="Model", value=self.model.value, inline=True)
+        embed.add_field(name="Renk", value=self.renk.value, inline=True)
+        embed.add_field(name="Sahiplik", value=self.sahiplik.value[:1024], inline=False)
+        embed.set_footer(text="Sancak Roleplay • Araç Kayıt")
+        view = AracOnay(interaction.user.id)
+        await log_kanal.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ Araç kaydınız alındı!", ephemeral=True)
 
 
-@bot.tree.command(name="arac_bilgi", description="Araç bilgilerini gösterir")
-async def arac_bilgi(interaction: discord.Interaction, kullanici: discord.Member = None):
-    if kullanici is None:
-        kullanici = interaction.user
-    conn = db_baglan()
-    c = conn.cursor()
-    c.execute("SELECT plaka, marka, model, renk FROM arac_kayit WHERE user_id = ?", (kullanici.id,))
-    kayit = c.fetchone()
-    conn.close()
-    if not kayit:
-        await interaction.response.send_message(f"{kullanici.mention} araç kaydı yok.", ephemeral=True)
-        return
-    plaka, marka, model, renk = kayit
-    embed = discord.Embed(title=f"🚗 {kullanici.display_name} Araç Bilgisi", color=discord.Color.dark_blue())
-    embed.add_field(name="Plaka", value=plaka)
-    embed.add_field(name="Marka", value=marka)
-    embed.add_field(name="Model", value=model)
-    embed.add_field(name="Renk", value=renk)
-    await interaction.response.send_message(embed=embed)
+class AracOnay(discord.ui.View):
+    def __init__(self, kullanici_id):
+        super().__init__(timeout=None)
+        self.kullanici_id = kullanici_id
+
+    @discord.ui.button(label="Onayla", style=discord.ButtonStyle.success, emoji="✅")
+    async def onayla(self, interaction, button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+            return
+        conn = db_baglan()
+        c = conn.cursor()
+        c.execute("UPDATE arac_kayit SET durum = 'onaylandi' WHERE user_id = ?", (self.kullanici_id,))
+        conn.commit()
+        conn.close()
+        uye = interaction.guild.get_member(self.kullanici_id)
+        try:
+            if uye:
+                await uye.send("🎉 Araç kaydınız onaylandı!")
+        except:
+            pass
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.green()
+        embed.set_footer(text=f"✅ Onaylayan: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("✅ Araç onaylandı.", ephemeral=True)
+
+    @discord.ui.button(label="Reddet", style=discord.ButtonStyle.danger, emoji="❌")
+    async def reddet(self, interaction, button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+            return
+        conn = db_baglan()
+        c = conn.cursor()
+        c.execute("UPDATE arac_kayit SET durum = 'reddedildi' WHERE user_id = ?", (self.kullanici_id,))
+        conn.commit()
+        conn.close()
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.red()
+        embed.set_footer(text=f"❌ Reddeden: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("❌ Araç reddedildi.", ephemeral=True)
+
+
+class AracPaneli(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Araç Kaydı Yap", style=discord.ButtonStyle.primary, emoji="🚗", custom_id="arac_btn")
+    async def kayit(self, interaction, button):
+        await interaction.response.send_modal(AracFormu())
+
+
+@bot.tree.command(name="arackur", description="Araç kayıt panelini kurar")
+@app_commands.default_permissions(administrator=True)
+async def arackur(interaction):
+    embed = discord.Embed(title="🚗 SANCAK ROLEPLAY ARAÇ KAYIT",
+                          description="**Araç Kaydı**\n\nAraçlarınızı kaydetmek için butona tıklayın.",
+                          color=discord.Color.dark_blue())
+    embed.set_footer(text="Sancak Roleplay • Araç Kayıt")
+    await interaction.channel.send(embed=embed, view=AracPaneli())
+    await interaction.response.send_message("✅ Araç paneli kuruldu.", ephemeral=True)
+
+
+@bot.tree.command(name="arac_ayar", description="Araç sistemini ayarlar")
+@app_commands.default_permissions(administrator=True)
+async def arac_ayar(interaction, log_kanal: discord.TextChannel):
+    ayar_koy("arac_log_kanal", log_kanal.id)
+    await interaction.response.send_message(f"✅ Araç log kanalı ayarlandı.", ephemeral=True)
 
 # ========================================
-# İŞ BAŞVURU SİSTEMİ
+# 4. İŞ BAŞVURU SİSTEMİ
 # ========================================
 
-@bot.tree.command(name="is_basvuru", description="İş başvurusu yapar")
-async def is_basvuru(interaction: discord.Interaction, is_turu: str, icerik: str):
-    conn = db_baglan()
-    c = conn.cursor()
-    c.execute("INSERT INTO is_basvuru (user_id, is_turu, icerik, durum, tarih) VALUES (?, ?, ?, 'beklemede', ?)",
-              (interaction.user.id, is_turu, icerik, datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-    await interaction.response.send_message(f"✅ **{is_turu}** iş başvurunuz alındı. Yetkililer inceleyecek.", ephemeral=True)
+class IsFormu(discord.ui.Modal, title="Sancak Roleplay - İş Başvurusu"):
+    is_turu = discord.ui.TextInput(label="Başvurulan İş Türü", style=discord.TextStyle.short, placeholder="Polis / Mafya / Teknik / Doktor", required=True)
+    isim = discord.ui.TextInput(label="Karakter İsminiz", style=discord.TextStyle.short, required=True)
+    yas = discord.ui.TextInput(label="Karakter Yaşınız", style=discord.TextStyle.short, required=True)
+    deneyim = discord.ui.TextInput(label="Bu İşteki Deneyiminiz", style=discord.TextStyle.paragraph, required=True)
+    neden = discord.ui.TextInput(label="Neden Bu İşi İstiyorsunuz?", style=discord.TextStyle.paragraph, required=True)
+
+    async def on_submit(self, interaction):
+        log_kanal_id = ayar_al("is_log_kanal")
+        if not log_kanal_id:
+            await interaction.response.send_message("❌ İş log kanalı ayarlanmamış!", ephemeral=True)
+            return
+        log_kanal = interaction.guild.get_channel(int(log_kanal_id))
+        if not log_kanal:
+            await interaction.response.send_message("❌ Log kanalı bulunamadı!", ephemeral=True)
+            return
+        icerik = f"İsim: {self.isim.value}\nYaş: {self.yas.value}\nDeneyim: {self.deneyim.value}\nNeden: {self.neden.value}"
+        conn = db_baglan()
+        c = conn.cursor()
+        c.execute("INSERT INTO is_basvuru (user_id, is_turu, icerik, durum, tarih) VALUES (?, ?, ?, 'beklemede', ?)",
+                  (interaction.user.id, self.is_turu.value, icerik, datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        embed = discord.Embed(title="💼 Sancak Roleplay - İş Başvurusu",
+                              description=f"**Başvuran:** {interaction.user.mention}\n**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+                              color=discord.Color.orange())
+        embed.add_field(name="İş Türü", value=self.is_turu.value, inline=False)
+        embed.add_field(name="İsim", value=self.isim.value, inline=True)
+        embed.add_field(name="Yaş", value=self.yas.value, inline=True)
+        embed.add_field(name="Deneyim", value=self.deneyim.value[:1024], inline=False)
+        embed.add_field(name="Neden", value=self.neden.value[:1024], inline=False)
+        embed.set_footer(text="Sancak Roleplay • İş Başvuru")
+        view = IsOnay(interaction.user.id)
+        await log_kanal.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ İş başvurunuz alındı!", ephemeral=True)
+
+
+class IsOnay(discord.ui.View):
+    def __init__(self, kullanici_id):
+        super().__init__(timeout=None)
+        self.kullanici_id = kullanici_id
+
+    @discord.ui.button(label="Onayla", style=discord.ButtonStyle.success, emoji="✅")
+    async def onayla(self, interaction, button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+            return
+        uye = interaction.guild.get_member(self.kullanici_id)
+        try:
+            if uye:
+                await uye.send("🎉 İş başvurunuz onaylandı!")
+        except:
+            pass
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.green()
+        embed.set_footer(text=f"✅ Onaylayan: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("✅ İş başvurusu onaylandı.", ephemeral=True)
+
+    @discord.ui.button(label="Reddet", style=discord.ButtonStyle.danger, emoji="❌")
+    async def reddet(self, interaction, button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+            return
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.red()
+        embed.set_footer(text=f"❌ Reddeden: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("❌ İş başvurusu reddedildi.", ephemeral=True)
+
+
+class IsPaneli(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="İş Başvurusu Yap", style=discord.ButtonStyle.primary, emoji="💼", custom_id="is_btn")
+    async def kayit(self, interaction, button):
+        await interaction.response.send_modal(IsFormu())
+
+
+@bot.tree.command(name="iskur", description="İş başvuru panelini kurar")
+@app_commands.default_permissions(administrator=True)
+async def iskur(interaction):
+    embed = discord.Embed(title="💼 SANCAK ROLEPLAY İŞ BAŞVURU",
+                          description="**İş Başvurusu**\n\nBir işe başvurmak için butona tıklayın.",
+                          color=discord.Color.orange())
+    embed.set_footer(text="Sancak Roleplay • İş Başvuru")
+    await interaction.channel.send(embed=embed, view=IsPaneli())
+    await interaction.response.send_message("✅ İş paneli kuruldu.", ephemeral=True)
+
+
+@bot.tree.command(name="is_ayar", description="İş başvuru sistemini ayarlar")
+@app_commands.default_permissions(administrator=True)
+async def is_ayar(interaction, log_kanal: discord.TextChannel):
+    ayar_koy("is_log_kanal", log_kanal.id)
+    await interaction.response.send_message(f"✅ İş log kanalı ayarlandı.", ephemeral=True)
 
 # ========================================
-# TICKET SİSTEMİ
+# 5. EHLİYET SİSTEMİ
+# ========================================
+
+class EhliyetFormu(discord.ui.Modal, title="Sancak Roleplay - Ehliyet Başvurusu"):
+    isim = discord.ui.TextInput(label="Adınız Soyadınız", style=discord.TextStyle.short, required=True)
+    yas = discord.ui.TextInput(label="Yaşınız", style=discord.TextStyle.short, required=True)
+    ehliyet_turu = discord.ui.TextInput(label="Ehliyet Türü", style=discord.TextStyle.short, placeholder="A / B / C / D", required=True)
+    deneyim = discord.ui.TextInput(label="Araç Kullanma Deneyiminiz", style=discord.TextStyle.paragraph, required=True)
+
+    async def on_submit(self, interaction):
+        log_kanal_id = ayar_al("ehliyet_log_kanal")
+        if not log_kanal_id:
+            await interaction.response.send_message("❌ Ehliyet log kanalı ayarlanmamış!", ephemeral=True)
+            return
+        log_kanal = interaction.guild.get_channel(int(log_kanal_id))
+        if not log_kanal:
+            await interaction.response.send_message("❌ Log kanalı bulunamadı!", ephemeral=True)
+            return
+        conn = db_baglan()
+        c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO ehliyet (user_id, isim, yas, ehliyet_turu, deneyim, durum, tarih) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (interaction.user.id, self.isim.value, self.yas.value, self.ehliyet_turu.value, self.deneyim.value, "beklemede", datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        embed = discord.Embed(title="🪪 Sancak Roleplay - Ehliyet Başvurusu",
+                              description=f"**Başvuran:** {interaction.user.mention}\n**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+                              color=discord.Color.teal())
+        embed.add_field(name="Ad Soyad", value=self.isim.value, inline=True)
+        embed.add_field(name="Yaş", value=self.yas.value, inline=True)
+        embed.add_field(name="Ehliyet Türü", value=self.ehliyet_turu.value, inline=True)
+        embed.add_field(name="Deneyim", value=self.deneyim.value[:1024], inline=False)
+        embed.set_footer(text="Sancak Roleplay • Ehliyet")
+        view = EhliyetOnay(interaction.user.id)
+        await log_kanal.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ Ehliyet başvurunuz alındı!", ephemeral=True)
+
+
+class EhliyetOnay(discord.ui.View):
+    def __init__(self, kullanici_id):
+        super().__init__(timeout=None)
+        self.kullanici_id = kullanici_id
+
+    @discord.ui.button(label="Onayla", style=discord.ButtonStyle.success, emoji="✅")
+    async def onayla(self, interaction, button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+            return
+        conn = db_baglan()
+        c = conn.cursor()
+        c.execute("UPDATE ehliyet SET durum = 'onaylandi' WHERE user_id = ?", (self.kullanici_id,))
+        conn.commit()
+        conn.close()
+        uye = interaction.guild.get_member(self.kullanici_id)
+        try:
+            if uye:
+                await uye.send("🎉 Ehliyet başvurunuz onaylandı!")
+        except:
+            pass
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.green()
+        embed.set_footer(text=f"✅ Onaylayan: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("✅ Ehliyet onaylandı.", ephemeral=True)
+
+    @discord.ui.button(label="Reddet", style=discord.ButtonStyle.danger, emoji="❌")
+    async def reddet(self, interaction, button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+            return
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.red()
+        embed.set_footer(text=f"❌ Reddeden: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("❌ Ehliyet reddedildi.", ephemeral=True)
+
+
+class EhliyetPaneli(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Ehliyet Başvurusu Yap", style=discord.ButtonStyle.primary, emoji="🪪", custom_id="ehliyet_btn")
+    async def kayit(self, interaction, button):
+        await interaction.response.send_modal(EhliyetFormu())
+
+
+@bot.tree.command(name="ehliyetkur", description="Ehliyet panelini kurar")
+@app_commands.default_permissions(administrator=True)
+async def ehliyetkur(interaction):
+    embed = discord.Embed(title="🪪 SANCAK ROLEPLAY EHLİYET BAŞVURU",
+                          description="**Ehliyet Başvurusu**\n\nAraç kullanmak için ehliyet başvurusu yapın.",
+                          color=discord.Color.teal())
+    embed.set_footer(text="Sancak Roleplay • Ehliyet")
+    await interaction.channel.send(embed=embed, view=EhliyetPaneli())
+    await interaction.response.send_message("✅ Ehliyet paneli kuruldu.", ephemeral=True)
+
+
+@bot.tree.command(name="ehliyet_ayar", description="Ehliyet sistemini ayarlar")
+@app_commands.default_permissions(administrator=True)
+async def ehliyet_ayar(interaction, log_kanal: discord.TextChannel):
+    ayar_koy("ehliyet_log_kanal", log_kanal.id)
+    await interaction.response.send_message(f"✅ Ehliyet log kanalı ayarlandı.", ephemeral=True)
+
+# ========================================
+# 6. SİLAH RUHSATI SİSTEMİ
+# ========================================
+
+class SilahFormu(discord.ui.Modal, title="Sancak Roleplay - Silah Ruhsatı"):
+    isim = discord.ui.TextInput(label="Adınız Soyadınız", style=discord.TextStyle.short, required=True)
+    silah_turu = discord.ui.TextInput(label="Silah Türü", style=discord.TextStyle.short, placeholder="Tabanca / Tüfek", required=True)
+    neden = discord.ui.TextInput(label="Neden Ruhsat İstiyorsunuz?", style=discord.TextStyle.paragraph, required=True)
+    gecmis = discord.ui.TextInput(label="Sabıka Kaydınız Var mı?", style=discord.TextStyle.short, required=True)
+
+    async def on_submit(self, interaction):
+        log_kanal_id = ayar_al("silah_log_kanal")
+        if not log_kanal_id:
+            await interaction.response.send_message("❌ Silah log kanalı ayarlanmamış!", ephemeral=True)
+            return
+        log_kanal = interaction.guild.get_channel(int(log_kanal_id))
+        if not log_kanal:
+            await interaction.response.send_message("❌ Log kanalı bulunamadı!", ephemeral=True)
+            return
+        conn = db_baglan()
+        c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO silah (user_id, isim, silah_turu, neden, gecmis, durum, tarih) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (interaction.user.id, self.isim.value, self.silah_turu.value, self.neden.value, self.gecmis.value, "beklemede", datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        embed = discord.Embed(title="🔫 Sancak Roleplay - Silah Ruhsatı",
+                              description=f"**Başvuran:** {interaction.user.mention}\n**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+                              color=discord.Color.dark_red())
+        embed.add_field(name="Ad Soyad", value=self.isim.value, inline=True)
+        embed.add_field(name="Silah Türü", value=self.silah_turu.value, inline=True)
+        embed.add_field(name="Sabıka", value=self.gecmis.value, inline=True)
+        embed.add_field(name="Neden", value=self.neden.value[:1024], inline=False)
+        embed.set_footer(text="Sancak Roleplay • Silah Ruhsatı")
+        view = SilahOnay(interaction.user.id)
+        await log_kanal.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ Silah ruhsatı başvurunuz alındı!", ephemeral=True)
+
+
+class SilahOnay(discord.ui.View):
+    def __init__(self, kullanici_id):
+        super().__init__(timeout=None)
+        self.kullanici_id = kullanici_id
+
+    @discord.ui.button(label="Onayla", style=discord.ButtonStyle.success, emoji="✅")
+    async def onayla(self, interaction, button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+            return
+        conn = db_baglan()
+        c = conn.cursor()
+        c.execute("UPDATE silah SET durum = 'onaylandi' WHERE user_id = ?", (self.kullanici_id,))
+        conn.commit()
+        conn.close()
+        uye = interaction.guild.get_member(self.kullanici_id)
+        try:
+            if uye:
+                await uye.send("🎉 Silah ruhsatı başvurunuz onaylandı!")
+        except:
+            pass
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.green()
+        embed.set_footer(text=f"✅ Onaylayan: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("✅ Silah ruhsatı onaylandı.", ephemeral=True)
+
+    @discord.ui.button(label="Reddet", style=discord.ButtonStyle.danger, emoji="❌")
+    async def reddet(self, interaction, button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+            return
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.red()
+        embed.set_footer(text=f"❌ Reddeden: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("❌ Silah ruhsatı reddedildi.", ephemeral=True)
+
+
+class SilahPaneli(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Silah Ruhsatı Başvurusu", style=discord.ButtonStyle.primary, emoji="🔫", custom_id="silah_btn")
+    async def kayit(self, interaction, button):
+        await interaction.response.send_modal(SilahFormu())
+
+
+@bot.tree.command(name="silahkur", description="Silah ruhsatı panelini kurar")
+@app_commands.default_permissions(administrator=True)
+async def silahkur(interaction):
+    embed = discord.Embed(title="🔫 SANCAK ROLEPLAY SİLAH RUHSATI",
+                          description="**Silah Ruhsatı**\n\nSilah taşımak için ruhsat başvurusu yapın.",
+                          color=discord.Color.dark_red())
+    embed.set_footer(text="Sancak Roleplay • Silah Ruhsatı")
+    await interaction.channel.send(embed=embed, view=SilahPaneli())
+    await interaction.response.send_message("✅ Silah paneli kuruldu.", ephemeral=True)
+
+
+@bot.tree.command(name="silah_ayar", description="Silah sistemini ayarlar")
+@app_commands.default_permissions(administrator=True)
+async def silah_ayar(interaction, log_kanal: discord.TextChannel):
+    ayar_koy("silah_log_kanal", log_kanal.id)
+    await interaction.response.send_message(f"✅ Silah log kanalı ayarlandı.", ephemeral=True)
+
+# ========================================
+# 7. EV KAYIT SİSTEMİ
+# ========================================
+
+class EvFormu(discord.ui.Modal, title="Sancak Roleplay - Ev Kaydı"):
+    isim = discord.ui.TextInput(label="Adınız Soyadınız", style=discord.TextStyle.short, required=True)
+    ev_adresi = discord.ui.TextInput(label="Ev Adresi", style=discord.TextStyle.short, required=True)
+    ev_turu = discord.ui.TextInput(label="Ev Türü", style=discord.TextStyle.short, placeholder="Daire / Villa / Müstakil", required=True)
+    fiyat = discord.ui.TextInput(label="Ödediğiniz Fiyat", style=discord.TextStyle.short, required=True)
+
+    async def on_submit(self, interaction):
+        log_kanal_id = ayar_al("ev_log_kanal")
+        if not log_kanal_id:
+            await interaction.response.send_message("❌ Ev log kanalı ayarlanmamış!", ephemeral=True)
+            return
+        log_kanal = interaction.guild.get_channel(int(log_kanal_id))
+        if not log_kanal:
+            await interaction.response.send_message("❌ Log kanalı bulunamadı!", ephemeral=True)
+            return
+        conn = db_baglan()
+        c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO ev (user_id, isim, ev_adresi, ev_turu, fiyat, durum, tarih) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (interaction.user.id, self.isim.value, self.ev_adresi.value, self.ev_turu.value, self.fiyat.value, "beklemede", datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        embed = discord.Embed(title="🏠 Sancak Roleplay - Ev Kaydı",
+                              description=f"**Başvuran:** {interaction.user.mention}\n**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+                              color=discord.Color.green())
+        embed.add_field(name="Ad Soyad", value=self.isim.value, inline=True)
+        embed.add_field(name="Ev Adresi", value=self.ev_adresi.value, inline=True)
+        embed.add_field(name="Ev Türü", value=self.ev_turu.value, inline=True)
+        embed.add_field(name="Fiyat", value=self.fiyat.value, inline=True)
+        embed.set_footer(text="Sancak Roleplay • Ev Kaydı")
+        view = EvOnay(interaction.user.id)
+        await log_kanal.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ Ev kaydınız alındı!", ephemeral=True)
+
+
+class EvOnay(discord.ui.View):
+    def __init__(self, kullanici_id):
+        super().__init__(timeout=None)
+        self.kullanici_id = kullanici_id
+
+    @discord.ui.button(label="Onayla", style=discord.ButtonStyle.success, emoji="✅")
+    async def onayla(self, interaction, button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+            return
+        conn = db_baglan()
+        c = conn.cursor()
+        c.execute("UPDATE ev SET durum = 'onaylandi' WHERE user_id = ?", (self.kullanici_id,))
+        conn.commit()
+        conn.close()
+        uye = interaction.guild.get_member(self.kullanici_id)
+        try:
+            if uye:
+                await uye.send("🎉 Ev kaydınız onaylandı!")
+        except:
+            pass
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.green()
+        embed.set_footer(text=f"✅ Onaylayan: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("✅ Ev onaylandı.", ephemeral=True)
+
+    @discord.ui.button(label="Reddet", style=discord.ButtonStyle.danger, emoji="❌")
+    async def reddet(self, interaction, button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+            return
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.red()
+        embed.set_footer(text=f"❌ Reddeden: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("❌ Ev reddedildi.", ephemeral=True)
+
+
+class EvPaneli(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Ev Kaydı Yap", style=discord.ButtonStyle.primary, emoji="🏠", custom_id="ev_btn")
+    async def kayit(self, interaction, button):
+        await interaction.response.send_modal(EvFormu())
+
+
+@bot.tree.command(name="evkur", description="Ev kayıt panelini kurar")
+@app_commands.default_permissions(administrator=True)
+async def evkur(interaction):
+    embed = discord.Embed(title="🏠 SANCAK ROLEPLAY EV KAYIT",
+                          description="**Ev Kaydı**\n\nEv satın aldıysanız kaydınızı yapın.",
+                          color=discord.Color.green())
+    embed.set_footer(text="Sancak Roleplay • Ev Kaydı")
+    await interaction.channel.send(embed=embed, view=EvPaneli())
+    await interaction.response.send_message("✅ Ev paneli kuruldu.", ephemeral=True)
+
+
+@bot.tree.command(name="ev_ayar", description="Ev sistemini ayarlar")
+@app_commands.default_permissions(administrator=True)
+async def ev_ayar(interaction, log_kanal: discord.TextChannel):
+    ayar_koy("ev_log_kanal", log_kanal.id)
+    await interaction.response.send_message(f"✅ Ev log kanalı ayarlandı.", ephemeral=True)
+
+# ========================================
+# 8. ŞİKAYET SİSTEMİ
+# ========================================
+
+class SikayetFormu(discord.ui.Modal, title="Sancak Roleplay - Şikayet"):
+    sikayet_edilen = discord.ui.TextInput(label="Şikayet Edilen Kişi", style=discord.TextStyle.short, required=True)
+    sebep = discord.ui.TextInput(label="Şikayet Sebebi", style=discord.TextStyle.paragraph, required=True)
+    kanit = discord.ui.TextInput(label="Kanıtınız Var mı?", style=discord.TextStyle.paragraph, required=False)
+
+    async def on_submit(self, interaction):
+        log_kanal_id = ayar_al("sikayet_log_kanal")
+        if not log_kanal_id:
+            await interaction.response.send_message("❌ Şikayet log kanalı ayarlanmamış!", ephemeral=True)
+            return
+        log_kanal = interaction.guild.get_channel(int(log_kanal_id))
+        if not log_kanal:
+            await interaction.response.send_message("❌ Log kanalı bulunamadı!", ephemeral=True)
+            return
+        conn = db_baglan()
+        c = conn.cursor()
+        c.execute("INSERT INTO sikayet (user_id, sikayet_edilen, sebep, kanit, durum, tarih) VALUES (?, ?, ?, ?, 'beklemede', ?)",
+                  (interaction.user.id, self.sikayet_edilen.value, self.sebep.value, self.kanit.value if self.kanit.value else "", datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        embed = discord.Embed(title="⚖️ Sancak Roleplay - Şikayet",
+                              description=f"**Şikayet Eden:** {interaction.user.mention}\n**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+                              color=discord.Color.dark_orange())
+        embed.add_field(name="Şikayet Edilen", value=self.sikayet_edilen.value, inline=False)
+        embed.add_field(name="Sebep", value=self.sebep.value[:1024], inline=False)
+        embed.add_field(name="Kanıt", value=self.kanit.value[:1024] if self.kanit.value else "Yok", inline=False)
+        embed.set_footer(text="Sancak Roleplay • Şikayet")
+        view = SikayetOnay(interaction.user.id)
+        await log_kanal.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ Şikayetiniz alındı!", ephemeral=True)
+
+
+class SikayetOnay(discord.ui.View):
+    def __init__(self, kullanici_id):
+        super().__init__(timeout=None)
+        self.kullanici_id = kullanici_id
+
+    @discord.ui.button(label="İşleme Al", style=discord.ButtonStyle.success, emoji="✅")
+    async def islem(self, interaction, button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+            return
+        uye = interaction.guild.get_member(self.kullanici_id)
+        try:
+            if uye:
+                await uye.send("🎉 Şikayetiniz işleme alındı.")
+        except:
+            pass
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.green()
+        embed.set_footer(text=f"✅ İşleme Alan: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("✅ Şikayet işleme alındı.", ephemeral=True)
+
+    @discord.ui.button(label="Reddet", style=discord.ButtonStyle.danger, emoji="❌")
+    async def reddet(self, interaction, button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+            return
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.red()
+        embed.set_footer(text=f"❌ Reddeden: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("❌ Şikayet reddedildi.", ephemeral=True)
+
+
+class SikayetPaneli(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Şikayet Oluştur", style=discord.ButtonStyle.primary, emoji="⚖️", custom_id="sikayet_btn")
+    async def kayit(self, interaction, button):
+        await interaction.response.send_modal(SikayetFormu())
+
+
+@bot.tree.command(name="sikayetkur", description="Şikayet panelini kurar")
+@app_commands.default_permissions(administrator=True)
+async def sikayetkur(interaction):
+    embed = discord.Embed(title="⚖️ SANCAK ROLEPLAY ŞİKAYET SİSTEMİ",
+                          description="**Şikayet Sistemi**\n\nBir kullanıcıdan şikayetçiyseniz butona tıklayın.",
+                          color=discord.Color.dark_orange())
+    embed.set_footer(text="Sancak Roleplay • Şikayet")
+    await interaction.channel.send(embed=embed, view=SikayetPaneli())
+    await interaction.response.send_message("✅ Şikayet paneli kuruldu.", ephemeral=True)
+
+
+@bot.tree.command(name="sikayet_ayar", description="Şikayet sistemini ayarlar")
+@app_commands.default_permissions(administrator=True)
+async def sikayet_ayar(interaction, log_kanal: discord.TextChannel):
+    ayar_koy("sikayet_log_kanal", log_kanal.id)
+    await interaction.response.send_message(f"✅ Şikayet log kanalı ayarlandı.", ephemeral=True)
+
+# ========================================
+# 9. TICKET SİSTEMİ
 # ========================================
 
 class TicketPanel(discord.ui.View):
@@ -524,19 +1059,19 @@ class TicketPanel(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="Oyun İçi Destek", style=discord.ButtonStyle.primary, emoji="🎮", custom_id="ticket_oyun")
-    async def oyun(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def oyun(self, interaction, button):
         await ticket_ac(interaction, "Oyun İçi Destek")
 
     @discord.ui.button(label="Teknik Destek", style=discord.ButtonStyle.secondary, emoji="🔧", custom_id="ticket_teknik")
-    async def teknik(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def teknik(self, interaction, button):
         await ticket_ac(interaction, "Teknik Destek")
 
     @discord.ui.button(label="Donate", style=discord.ButtonStyle.success, emoji="🛒", custom_id="ticket_donate")
-    async def donate(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def donate(self, interaction, button):
         await ticket_ac(interaction, "Donate")
 
     @discord.ui.button(label="AntiCheat", style=discord.ButtonStyle.danger, emoji="🔨", custom_id="ticket_anticheat")
-    async def anticheat(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def anticheat(self, interaction, button):
         await ticket_ac(interaction, "AntiCheat")
 
 
@@ -601,50 +1136,14 @@ class TicketKontrol(discord.ui.View):
 
 @bot.tree.command(name="ticketkur", description="Ticket panelini kurar")
 @app_commands.default_permissions(administrator=True)
-async def ticketkur(interaction: discord.Interaction):
+async def ticketkur(interaction):
     embed = discord.Embed(title="🎫 Sancak RP Destek Sistemi", description="Bilet oluşturmak için butonlara tıklayın.", color=discord.Color.blue())
     embed.set_footer(text="Sancak Roleplay • Destek")
     await interaction.channel.send(embed=embed, view=TicketPanel())
     await interaction.response.send_message("✅ Panel kuruldu.", ephemeral=True)
 
 # ========================================
-# ROL SİSTEMİ
-# ========================================
-
-@bot.tree.command(name="rolver", description="Rol verir (Guard/Cmds)")
-async def rolver(interaction, kullanici: discord.Member, rol: discord.Role):
-    if not yetkili_mi(interaction.user, YETKILI_ROLLER):
-        await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
-        return
-    await kullanici.add_roles(rol)
-    await interaction.response.send_message(embed=embed_yap("🎭 ROL VERİLDİ", f"{kullanici.mention} → {rol.mention}", discord.Color.green()))
-
-@bot.tree.command(name="rolal", description="Rol alır (Guard/Cmds)")
-async def rolal(interaction, kullanici: discord.Member, rol: discord.Role):
-    if not yetkili_mi(interaction.user, YETKILI_ROLLER):
-        await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
-        return
-    await kullanici.remove_roles(rol)
-    await interaction.response.send_message(embed=embed_yap("🎭 ROL ALINDI", f"{kullanici.mention} ← {rol.mention}", discord.Color.red()))
-
-@bot.tree.command(name="toplurol", description="Tüm üyelere rol verir (Guard/Cmds)")
-async def toplurol(interaction, rol: discord.Role):
-    if not yetkili_mi(interaction.user, YETKILI_ROLLER):
-        await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
-        return
-    await interaction.response.send_message(f"🎭 {rol.mention} veriliyor...", ephemeral=True)
-    sayac = 0
-    for uye in interaction.guild.members:
-        if uye.bot: continue
-        try:
-            await uye.add_roles(rol)
-            sayac += 1
-            await asyncio.sleep(0.3)
-        except: pass
-    await interaction.channel.send(f"✅ {sayac} üyeye verildi.")
-
-# ========================================
-# MODERASYON
+# 10. MODERASYON
 # ========================================
 
 @bot.tree.command(name="ban", description="Ban atar")
@@ -670,6 +1169,34 @@ async def ipban(interaction, kullanici: discord.Member, sebep: str = "Belirtilme
         return
     await interaction.guild.ban(kullanici, reason=f"[IP BAN] {sebep} | {interaction.user}")
     await interaction.response.send_message(embed=embed_yap("🚫 IP BAN", f"{kullanici.mention} IP banlandı.\n**Sebep:** {sebep}", discord.Color.dark_red()))
+
+@bot.tree.command(name="unban", description="Ban kaldırır")
+async def unban(interaction, kullanici_id: str):
+    if not yetkili_mi(interaction.user, MOD_ROLLER):
+        await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+        return
+    try:
+        user = await bot.fetch_user(int(kullanici_id))
+        await interaction.guild.unban(user)
+        await interaction.response.send_message(f"✅ {user.mention} banı kaldırıldı.")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Hata: {e}", ephemeral=True)
+
+@bot.tree.command(name="timeout", description="Susturur")
+async def timeout(interaction, kullanici: discord.Member, dakika: int, sebep: str = "Belirtilmedi"):
+    if not yetkili_mi(interaction.user, MOD_ROLLER):
+        await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+        return
+    await kullanici.timeout(timedelta(minutes=dakika), reason=sebep)
+    await interaction.response.send_message(f"⏸️ {kullanici.mention} {dakika} dakika susturuldu.")
+
+@bot.tree.command(name="untimeout", description="Susturmayı kaldırır")
+async def untimeout(interaction, kullanici: discord.Member):
+    if not yetkili_mi(interaction.user, MOD_ROLLER):
+        await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+        return
+    await kullanici.timeout(None)
+    await interaction.response.send_message(f"▶️ {kullanici.mention} susturması kaldırıldı.")
 
 @bot.tree.command(name="uyari", description="Uyarı verir")
 async def uyari(interaction, kullanici: discord.Member, sebep: str = "Belirtilmedi"):
@@ -697,39 +1224,47 @@ async def uyarilar(interaction, kullanici: discord.Member):
     mesaj = "\n".join([f"• {s} ({t[:10]})" for s, t in kayitlar])
     await interaction.response.send_message(embed=embed_yap(f"⚠️ {kullanici.display_name}", mesaj, discord.Color.orange()))
 
-@bot.tree.command(name="unban", description="Ban kaldırır")
-async def unban(interaction, kullanici_id: str, sebep: str = "Belirtilmedi"):
-    if not yetkili_mi(interaction.user, MOD_ROLLER):
-        await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
-        return
-    try:
-        user = await bot.fetch_user(int(kullanici_id))
-        await interaction.guild.unban(user, reason=sebep)
-        await interaction.response.send_message(f"✅ {user.mention} banı kaldırıldı.")
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Hata: {e}", ephemeral=True)
-
-@bot.tree.command(name="timeout", description="Kullanıcıyı susturur")
-async def timeout(interaction, kullanici: discord.Member, dakika: int, sebep: str = "Belirtilmedi"):
-    if not yetkili_mi(interaction.user, MOD_ROLLER):
-        await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
-        return
-    await kullanici.timeout(timedelta(minutes=dakika), reason=sebep)
-    await interaction.response.send_message(f"⏸️ {kullanici.mention} {dakika} dakika susturuldu.")
-
-@bot.tree.command(name="untimeout", description="Susturmayı kaldırır")
-async def untimeout(interaction, kullanici: discord.Member):
-    if not yetkili_mi(interaction.user, MOD_ROLLER):
-        await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
-        return
-    await kullanici.timeout(None)
-    await interaction.response.send_message(f"▶️ {kullanici.mention} susturması kaldırıldı.")
-
 # ========================================
-# İSTATİSTİK
+# 11. ROL SİSTEMİ
 # ========================================
 
-@bot.tree.command(name="profil", description="Profilini gösterir")
+@bot.tree.command(name="rolver", description="Rol verir")
+async def rolver(interaction, kullanici: discord.Member, rol: discord.Role):
+    if not yetkili_mi(interaction.user, YETKILI_ROLLER):
+        await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+        return
+    await kullanici.add_roles(rol)
+    await interaction.response.send_message(embed=embed_yap("🎭 ROL VERİLDİ", f"{kullanici.mention} → {rol.mention}", discord.Color.green()))
+
+@bot.tree.command(name="rolal", description="Rol alır")
+async def rolal(interaction, kullanici: discord.Member, rol: discord.Role):
+    if not yetkili_mi(interaction.user, YETKILI_ROLLER):
+        await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+        return
+    await kullanici.remove_roles(rol)
+    await interaction.response.send_message(embed=embed_yap("🎭 ROL ALINDI", f"{kullanici.mention} ← {rol.mention}", discord.Color.red()))
+
+@bot.tree.command(name="toplurol", description="Tüm üyelere rol verir")
+async def toplurol(interaction, rol: discord.Role):
+    if not yetkili_mi(interaction.user, YETKILI_ROLLER):
+        await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
+        return
+    await interaction.response.send_message(f"🎭 {rol.mention} veriliyor...", ephemeral=True)
+    sayac = 0
+    for uye in interaction.guild.members:
+        if uye.bot: continue
+        try:
+            await uye.add_roles(rol)
+            sayac += 1
+            await asyncio.sleep(0.3)
+        except: pass
+    await interaction.channel.send(f"✅ {sayac} üyeye verildi.")
+
+# ========================================
+# 12. İSTATİSTİK
+# ========================================
+
+@bot.tree.command(name="profil", description="Profil gösterir")
 async def profil(interaction, kullanici: discord.Member = None):
     if kullanici is None: kullanici = interaction.user
     conn = db_baglan()
@@ -779,10 +1314,10 @@ async def gunluk(interaction):
     await interaction.response.send_message(embed=embed_yap("🎁 GÜNLÜK ÖDÜL", f"**+{odul} XP** kazandın!", discord.Color.green()))
 
 # ========================================
-# ETKİNLİK
+# 13. ETKİNLİK
 # ========================================
 
-@bot.tree.command(name="duyuru", description="Duyuru atar (Admin)")
+@bot.tree.command(name="duyuru", description="Duyuru atar")
 @app_commands.default_permissions(administrator=True)
 async def duyuru(interaction, baslik: str, mesaj: str):
     embed = discord.Embed(title=f"📢 {baslik}", description=mesaj, color=discord.Color.red())
@@ -790,7 +1325,7 @@ async def duyuru(interaction, baslik: str, mesaj: str):
     await interaction.channel.send("@everyone", embed=embed)
     await interaction.response.send_message("✅ Duyuru atıldı.", ephemeral=True)
 
-@bot.tree.command(name="anket", description="Anket (Admin)")
+@bot.tree.command(name="anket", description="Anket oluşturur")
 @app_commands.default_permissions(administrator=True)
 async def anket(interaction, soru: str):
     embed = discord.Embed(title="📊 Sancak RP Anket", description=soru, color=discord.Color.blue())
@@ -799,7 +1334,7 @@ async def anket(interaction, soru: str):
     await msg.add_reaction("❌")
     await interaction.response.send_message("✅ Anket kuruldu.", ephemeral=True)
 
-@bot.tree.command(name="cekiliş", description="Çekiliş (Admin)")
+@bot.tree.command(name="cekiliş", description="Çekiliş başlatır")
 @app_commands.default_permissions(administrator=True)
 async def cekilis(interaction, odul: str, sure: int):
     embed = discord.Embed(title="🎉 SANCAK RP ÇEKİLİŞ!", description=f"**Ödül:** {odul}\n**Süre:** {sure} saniye\n🎉 emojisine tıkla!", color=discord.Color.gold())
@@ -816,38 +1351,43 @@ async def cekilis(interaction, odul: str, sure: int):
                 await interaction.channel.send(f"🎉 Tebrikler {kazanan.mention}! **{odul}** kazandın!")
 
 # ========================================
-# YÖNETİM
+# 14. YÖNETİM
 # ========================================
 
-@bot.tree.command(name="log_kanal", description="Log kanalı (Admin)")
+@bot.tree.command(name="log_kanal", description="Log kanalı ayarlar")
 @app_commands.default_permissions(administrator=True)
 async def log_kanal(interaction, kanal: discord.TextChannel):
     ayar_koy("log_kanal", kanal.id)
-    await interaction.response.send_message(f"✅ Log kanalı {kanal.mention} olarak ayarlandı.", ephemeral=True)
+    await interaction.response.send_message(f"✅ Log kanalı {kanal.mention}", ephemeral=True)
 
-@bot.tree.command(name="ticket_kategori", description="Ticket kategori (Admin)")
+@bot.tree.command(name="ticket_kategori", description="Ticket kategori ayarlar")
 @app_commands.default_permissions(administrator=True)
 async def ticket_kategori(interaction, kategori: discord.CategoryChannel):
     ayar_koy("ticket_kategori", kategori.id)
-    await interaction.response.send_message(f"✅ Ticket kategorisi {kategori.name} olarak ayarlandı.", ephemeral=True)
+    await interaction.response.send_message(f"✅ Ticket kategorisi {kategori.name}", ephemeral=True)
 
-@bot.tree.command(name="ayarlar", description="Bot ayarlarını gösterir")
+@bot.tree.command(name="ayarlar", description="Ayarları gösterir")
 async def ayarlar(interaction):
-    log_k = ayar_al("log_kanal", "Ayarlanmadı")
-    ticket_k = ayar_al("ticket_kategori", "Ayarlanmadı")
-    kayit_log = ayar_al("kayit_log_kanal", "Ayarlanmadı")
-    kayit_rol = ayar_al("kayit_verilecek_rol", "Ayarlanmadı")
-    kar_log = ayar_al("karakter_log_kanal", "Ayarlanmadı")
     embed = discord.Embed(title="⚙️ Sancak RP Bot Ayarları", color=discord.Color.blue())
-    embed.add_field(name="Log Kanalı", value=f"<#{log_k}>" if log_k != "Ayarlanmadı" else log_k)
-    embed.add_field(name="Ticket Kategorisi", value=f"<#{ticket_k}>" if ticket_k != "Ayarlanmadı" else ticket_k)
-    embed.add_field(name="Kayıt Log Kanalı", value=f"<#{kayit_log}>" if kayit_log != "Ayarlanmadı" else kayit_log)
-    embed.add_field(name="Kayıt Verilecek Rol", value=f"<@&{kayit_rol}>" if kayit_rol != "Ayarlanmadı" else kayit_rol)
-    embed.add_field(name="Karakter Log Kanalı", value=f"<#{kar_log}>" if kar_log != "Ayarlanmadı" else kar_log)
+    for anahtar, isim in [
+        ("log_kanal", "Log Kanalı"),
+        ("ticket_kategori", "Ticket Kategorisi"),
+        ("kayit_log_kanal", "Kayıt Log"),
+        ("kayit_verilecek_rol", "Kayıt Rolü"),
+        ("karakter_log_kanal", "Karakter Log"),
+        ("arac_log_kanal", "Araç Log"),
+        ("is_log_kanal", "İş Log"),
+        ("ehliyet_log_kanal", "Ehliyet Log"),
+        ("silah_log_kanal", "Silah Log"),
+        ("ev_log_kanal", "Ev Log"),
+        ("sikayet_log_kanal", "Şikayet Log"),
+    ]:
+        deger = ayar_al(anahtar, "Ayarlanmadı")
+        embed.add_field(name=isim, value=f"<#{deger}>" if deger != "Ayarlanmadı" else deger, inline=True)
     await interaction.response.send_message(embed=embed)
 
 # ========================================
-# EĞLENCE
+# 15. EĞLENCE
 # ========================================
 
 @bot.tree.command(name="zar", description="Zar atar")
