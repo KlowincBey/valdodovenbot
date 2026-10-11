@@ -109,6 +109,15 @@ def yetkili_mi(member, roller):
 def embed_yap(baslik, aciklama, renk=discord.Color.blue()):
     return discord.Embed(title=baslik, description=aciklama, color=renk, timestamp=datetime.now())
 
+async def banner_gonder(kanal, embed, view):
+    """Banner varsa dosya ile gönderir, yoksa normal gönderir."""
+    if os.path.exists("banner.png"):
+        file = discord.File("banner.png", filename="banner.png")
+        embed.set_image(url="attachment://banner.png")
+        await kanal.send(file=file, embed=embed, view=view)
+    else:
+        await kanal.send(embed=embed, view=view)
+
 # ========================================
 # HAZIR
 # ========================================
@@ -283,11 +292,30 @@ class KayitPaneli(discord.ui.View):
 @bot.tree.command(name="kayitkur", description="Kayıt panelini kurar")
 @app_commands.default_permissions(administrator=True)
 async def kayitkur(interaction):
-    embed = discord.Embed(title="🎫 SANCAK ROLEPLAY KAYIT SİSTEMİ",
-                          description="**Hoş Geldiniz!**\n\nSunucumuza katılmak için kayıt olmanız gerekmektedir.\n\nAşağıdaki butona tıklayarak formu doldurun.",
-                          color=discord.Color.blue())
-    embed.set_footer(text="Sancak Roleplay • Whitelist")
-    await interaction.channel.send(embed=embed, view=KayitPaneli())
+    embed = discord.Embed(
+        title="🎫 SANCAK ROLEPLAY KAYIT SİSTEMİ",
+        description="**Hoş Geldiniz!**\n\n"
+                    "Sunucumuza katılmak ve rol yapmaya başlamak için öncelikle kayıt başvurusunda bulunmanız gerekmektedir.\n\n"
+                    "Aşağıdaki buton aracılığıyla başvuru formunu doldurabilirsiniz. "
+                    "Başvurunuz yetkili ekibimiz tarafından incelenecek ve en kısa sürede sonuçlandırılacaktır.",
+        color=discord.Color.from_rgb(0, 102, 204)
+    )
+    embed.add_field(
+        name="⚠️ Unutmayın",
+        value="Lütfen formu doldururken kurallarımızı ve temel rol yapma terimlerini "
+              "(Meta Gaming, Fail RP vb.) bildiğinizden emin olun.",
+        inline=False
+    )
+    embed.add_field(
+        name="📋 Genel Kurallar",
+        value="• Başvurunuz 24 saat içinde incelenir.\n"
+              "• Yanlış bilgi verenler reddedilir.\n"
+              "• Sadece 1 kez başvuru yapabilirsiniz.\n"
+              "• Kabul edilirseniz DM'den bilgilendirileceksiniz.",
+        inline=False
+    )
+    embed.set_footer(text="Sancak Roleplay • Whitelist Sistemi", icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+    await banner_gonder(interaction.channel, embed, KayitPaneli())
     await interaction.response.send_message("✅ Kayıt paneli kuruldu.", ephemeral=True)
 
 
@@ -296,7 +324,7 @@ async def kayitkur(interaction):
 async def kayit_ayar(interaction, log_kanal: discord.TextChannel, verilecek_rol: discord.Role):
     ayar_koy("kayit_log_kanal", log_kanal.id)
     ayar_koy("kayit_verilecek_rol", verilecek_rol.id)
-    await interaction.response.send_message(f"✅ Kayıt sistemi ayarlandı.", ephemeral=True)
+    await interaction.response.send_message("✅ Kayıt sistemi ayarlandı.", ephemeral=True)
 
 # ========================================
 # 2. KARAKTER KAYIT SİSTEMİ
@@ -373,12 +401,6 @@ class KarakterOnay(discord.ui.View):
         c.execute("UPDATE karakterler SET durum = 'reddedildi' WHERE user_id = ?", (self.kullanici_id,))
         conn.commit()
         conn.close()
-        uye = interaction.guild.get_member(self.kullanici_id)
-        try:
-            if uye:
-                await uye.send("Üzgünüz, karakter kaydınız reddedildi.")
-        except:
-            pass
         embed = interaction.message.embeds[0]
         embed.color = discord.Color.red()
         embed.set_footer(text=f"❌ Reddeden: {interaction.user.display_name}")
@@ -398,11 +420,16 @@ class KarakterPaneli(discord.ui.View):
 @bot.tree.command(name="karakterkur", description="Karakter kayıt panelini kurar")
 @app_commands.default_permissions(administrator=True)
 async def karakterkur(interaction):
-    embed = discord.Embed(title="🎮 SANCAK ROLEPLAY KARAKTER KAYIT",
-                          description="**Karakter Kaydı**\n\nRol yapmaya başlamadan önce karakter kaydınızı oluşturun.",
-                          color=discord.Color.purple())
-    embed.set_footer(text="Sancak Roleplay • Karakter Kayıt")
-    await interaction.channel.send(embed=embed, view=KarakterPaneli())
+    embed = discord.Embed(
+        title="🎮 SANCAK ROLEPLAY KARAKTER KAYIT",
+        description="**Karakter Kaydı**\n\n"
+                    "Sunucumuzda rol yapmaya başlamadan önce karakterinizi oluşturmanız gerekmektedir.\n\n"
+                    "Aşağıdaki butona tıklayarak karakter formunu doldurabilirsiniz.",
+        color=discord.Color.purple()
+    )
+    embed.add_field(name="⚠️ Unutmayın", value="• Karakter isminiz RP kurallarına uygun olmalıdır.\n• Hikayeniz en az 3-4 cümle olmalıdır.", inline=False)
+    embed.set_footer(text="Sancak Roleplay • Karakter Kayıt", icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+    await banner_gonder(interaction.channel, embed, KarakterPaneli())
     await interaction.response.send_message("✅ Karakter paneli kuruldu.", ephemeral=True)
 
 
@@ -410,7 +437,7 @@ async def karakterkur(interaction):
 @app_commands.default_permissions(administrator=True)
 async def karakter_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("karakter_log_kanal", log_kanal.id)
-    await interaction.response.send_message(f"✅ Karakter log kanalı ayarlandı.", ephemeral=True)
+    await interaction.response.send_message("✅ Karakter log kanalı ayarlandı.", ephemeral=True)
 
 
 @bot.tree.command(name="karakter_bilgi", description="Karakter bilgilerini gösterir")
@@ -530,11 +557,14 @@ class AracPaneli(discord.ui.View):
 @bot.tree.command(name="arackur", description="Araç kayıt panelini kurar")
 @app_commands.default_permissions(administrator=True)
 async def arackur(interaction):
-    embed = discord.Embed(title="🚗 SANCAK ROLEPLAY ARAÇ KAYIT",
-                          description="**Araç Kaydı**\n\nAraçlarınızı kaydetmek için butona tıklayın.",
-                          color=discord.Color.dark_blue())
-    embed.set_footer(text="Sancak Roleplay • Araç Kayıt")
-    await interaction.channel.send(embed=embed, view=AracPaneli())
+    embed = discord.Embed(
+        title="🚗 SANCAK ROLEPLAY ARAÇ KAYIT",
+        description="**Araç Kaydı**\n\nSunucuda kullanacağınız araçları kaydetmek için aşağıdaki butona tıklayın.",
+        color=discord.Color.dark_blue()
+    )
+    embed.add_field(name="⚠️ Unutmayın", value="• Çalıntı araç kaydı yasaktır.\n• Plaka RP kurallarına uygun olmalıdır.", inline=False)
+    embed.set_footer(text="Sancak Roleplay • Araç Kayıt", icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+    await banner_gonder(interaction.channel, embed, AracPaneli())
     await interaction.response.send_message("✅ Araç paneli kuruldu.", ephemeral=True)
 
 
@@ -542,7 +572,7 @@ async def arackur(interaction):
 @app_commands.default_permissions(administrator=True)
 async def arac_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("arac_log_kanal", log_kanal.id)
-    await interaction.response.send_message(f"✅ Araç log kanalı ayarlandı.", ephemeral=True)
+    await interaction.response.send_message("✅ Araç log kanalı ayarlandı.", ephemeral=True)
 
 # ========================================
 # 4. İŞ BAŞVURU SİSTEMİ
@@ -631,11 +661,14 @@ class IsPaneli(discord.ui.View):
 @bot.tree.command(name="iskur", description="İş başvuru panelini kurar")
 @app_commands.default_permissions(administrator=True)
 async def iskur(interaction):
-    embed = discord.Embed(title="💼 SANCAK ROLEPLAY İŞ BAŞVURU",
-                          description="**İş Başvurusu**\n\nBir işe başvurmak için butona tıklayın.",
-                          color=discord.Color.orange())
-    embed.set_footer(text="Sancak Roleplay • İş Başvuru")
-    await interaction.channel.send(embed=embed, view=IsPaneli())
+    embed = discord.Embed(
+        title="💼 SANCAK ROLEPLAY İŞ BAŞVURU",
+        description="**İş Başvurusu**\n\nSunucumuzda bir işe başvurmak için aşağıdaki butona tıklayın.",
+        color=discord.Color.orange()
+    )
+    embed.add_field(name="📋 Mevcut İşler", value="• 👮 Polis\n• 🚑 Doktor\n• 🔧 Teknik\n• 🕵️ Mafya\n• 🎭 Aktör", inline=False)
+    embed.set_footer(text="Sancak Roleplay • İş Başvuru", icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+    await banner_gonder(interaction.channel, embed, IsPaneli())
     await interaction.response.send_message("✅ İş paneli kuruldu.", ephemeral=True)
 
 
@@ -643,7 +676,7 @@ async def iskur(interaction):
 @app_commands.default_permissions(administrator=True)
 async def is_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("is_log_kanal", log_kanal.id)
-    await interaction.response.send_message(f"✅ İş log kanalı ayarlandı.", ephemeral=True)
+    await interaction.response.send_message("✅ İş log kanalı ayarlandı.", ephemeral=True)
 
 # ========================================
 # 5. EHLİYET SİSTEMİ
@@ -734,11 +767,14 @@ class EhliyetPaneli(discord.ui.View):
 @bot.tree.command(name="ehliyetkur", description="Ehliyet panelini kurar")
 @app_commands.default_permissions(administrator=True)
 async def ehliyetkur(interaction):
-    embed = discord.Embed(title="🪪 SANCAK ROLEPLAY EHLİYET BAŞVURU",
-                          description="**Ehliyet Başvurusu**\n\nAraç kullanmak için ehliyet başvurusu yapın.",
-                          color=discord.Color.teal())
-    embed.set_footer(text="Sancak Roleplay • Ehliyet")
-    await interaction.channel.send(embed=embed, view=EhliyetPaneli())
+    embed = discord.Embed(
+        title="🪪 SANCAK ROLEPLAY EHLİYET BAŞVURU",
+        description="**Ehliyet Başvurusu**\n\nAraç kullanmak için ehliyet başvurusunda bulunmanız gerekmektedir.",
+        color=discord.Color.teal()
+    )
+    embed.add_field(name="📋 Ehliyet Türleri", value="• 🏍️ **A** - Motosiklet\n• 🚗 **B** - Otomobil\n• 🚚 **C** - Kamyon", inline=False)
+    embed.set_footer(text="Sancak Roleplay • Ehliyet", icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+    await banner_gonder(interaction.channel, embed, EhliyetPaneli())
     await interaction.response.send_message("✅ Ehliyet paneli kuruldu.", ephemeral=True)
 
 
@@ -746,7 +782,7 @@ async def ehliyetkur(interaction):
 @app_commands.default_permissions(administrator=True)
 async def ehliyet_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("ehliyet_log_kanal", log_kanal.id)
-    await interaction.response.send_message(f"✅ Ehliyet log kanalı ayarlandı.", ephemeral=True)
+    await interaction.response.send_message("✅ Ehliyet log kanalı ayarlandı.", ephemeral=True)
 
 # ========================================
 # 6. SİLAH RUHSATI SİSTEMİ
@@ -837,11 +873,14 @@ class SilahPaneli(discord.ui.View):
 @bot.tree.command(name="silahkur", description="Silah ruhsatı panelini kurar")
 @app_commands.default_permissions(administrator=True)
 async def silahkur(interaction):
-    embed = discord.Embed(title="🔫 SANCAK ROLEPLAY SİLAH RUHSATI",
-                          description="**Silah Ruhsatı**\n\nSilah taşımak için ruhsat başvurusu yapın.",
-                          color=discord.Color.dark_red())
-    embed.set_footer(text="Sancak Roleplay • Silah Ruhsatı")
-    await interaction.channel.send(embed=embed, view=SilahPaneli())
+    embed = discord.Embed(
+        title="🔫 SANCAK ROLEPLAY SİLAH RUHSATI",
+        description="**Silah Ruhsatı**\n\nSilah taşımak için ruhsat başvurusunda bulunmanız gerekmektedir.",
+        color=discord.Color.dark_red()
+    )
+    embed.add_field(name="⚠️ Unutmayın", value="• Ruhsatsız silah taşımak yasaktır.\n• Sabıka kaydı olanlar başvuramaz.", inline=False)
+    embed.set_footer(text="Sancak Roleplay • Silah Ruhsatı", icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+    await banner_gonder(interaction.channel, embed, SilahPaneli())
     await interaction.response.send_message("✅ Silah paneli kuruldu.", ephemeral=True)
 
 
@@ -849,7 +888,7 @@ async def silahkur(interaction):
 @app_commands.default_permissions(administrator=True)
 async def silah_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("silah_log_kanal", log_kanal.id)
-    await interaction.response.send_message(f"✅ Silah log kanalı ayarlandı.", ephemeral=True)
+    await interaction.response.send_message("✅ Silah log kanalı ayarlandı.", ephemeral=True)
 
 # ========================================
 # 7. EV KAYIT SİSTEMİ
@@ -940,11 +979,14 @@ class EvPaneli(discord.ui.View):
 @bot.tree.command(name="evkur", description="Ev kayıt panelini kurar")
 @app_commands.default_permissions(administrator=True)
 async def evkur(interaction):
-    embed = discord.Embed(title="🏠 SANCAK ROLEPLAY EV KAYIT",
-                          description="**Ev Kaydı**\n\nEv satın aldıysanız kaydınızı yapın.",
-                          color=discord.Color.green())
-    embed.set_footer(text="Sancak Roleplay • Ev Kaydı")
-    await interaction.channel.send(embed=embed, view=EvPaneli())
+    embed = discord.Embed(
+        title="🏠 SANCAK ROLEPLAY EV KAYIT",
+        description="**Ev Kaydı**\n\nSunucumuzda bir ev satın aldıysanız, kaydınızı yapmak için butona tıklayın.",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="📋 Ev Türleri", value="• 🏢 Daire\n• 🏡 Villa\n• 🏘️ Müstakil\n• 🏰 Malikane", inline=False)
+    embed.set_footer(text="Sancak Roleplay • Ev Kaydı", icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+    await banner_gonder(interaction.channel, embed, EvPaneli())
     await interaction.response.send_message("✅ Ev paneli kuruldu.", ephemeral=True)
 
 
@@ -952,7 +994,7 @@ async def evkur(interaction):
 @app_commands.default_permissions(administrator=True)
 async def ev_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("ev_log_kanal", log_kanal.id)
-    await interaction.response.send_message(f"✅ Ev log kanalı ayarlandı.", ephemeral=True)
+    await interaction.response.send_message("✅ Ev log kanalı ayarlandı.", ephemeral=True)
 
 # ========================================
 # 8. ŞİKAYET SİSTEMİ
@@ -1036,11 +1078,14 @@ class SikayetPaneli(discord.ui.View):
 @bot.tree.command(name="sikayetkur", description="Şikayet panelini kurar")
 @app_commands.default_permissions(administrator=True)
 async def sikayetkur(interaction):
-    embed = discord.Embed(title="⚖️ SANCAK ROLEPLAY ŞİKAYET SİSTEMİ",
-                          description="**Şikayet Sistemi**\n\nBir kullanıcıdan şikayetçiyseniz butona tıklayın.",
-                          color=discord.Color.dark_orange())
-    embed.set_footer(text="Sancak Roleplay • Şikayet")
-    await interaction.channel.send(embed=embed, view=SikayetPaneli())
+    embed = discord.Embed(
+        title="⚖️ SANCAK ROLEPLAY ŞİKAYET SİSTEMİ",
+        description="**Şikayet Sistemi**\n\nSunucumuzda bir kullanıcıdan şikayetçiyseniz butona tıklayın.",
+        color=discord.Color.dark_orange()
+    )
+    embed.add_field(name="⚠️ Unutmayın", value="• Sahte şikayet kalıcı ban sebebidir.\n• Kanıtınız yoksa reddedilir.", inline=False)
+    embed.set_footer(text="Sancak Roleplay • Şikayet", icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+    await banner_gonder(interaction.channel, embed, SikayetPaneli())
     await interaction.response.send_message("✅ Şikayet paneli kuruldu.", ephemeral=True)
 
 
@@ -1048,7 +1093,7 @@ async def sikayetkur(interaction):
 @app_commands.default_permissions(administrator=True)
 async def sikayet_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("sikayet_log_kanal", log_kanal.id)
-    await interaction.response.send_message(f"✅ Şikayet log kanalı ayarlandı.", ephemeral=True)
+    await interaction.response.send_message("✅ Şikayet log kanalı ayarlandı.", ephemeral=True)
 
 # ========================================
 # 9. TICKET SİSTEMİ
@@ -1137,10 +1182,18 @@ class TicketKontrol(discord.ui.View):
 @bot.tree.command(name="ticketkur", description="Ticket panelini kurar")
 @app_commands.default_permissions(administrator=True)
 async def ticketkur(interaction):
-    embed = discord.Embed(title="🎫 Sancak RP Destek Sistemi", description="Bilet oluşturmak için butonlara tıklayın.", color=discord.Color.blue())
-    embed.set_footer(text="Sancak Roleplay • Destek")
-    await interaction.channel.send(embed=embed, view=TicketPanel())
-    await interaction.response.send_message("✅ Panel kuruldu.", ephemeral=True)
+    embed = discord.Embed(
+        title="🎫 SANCAK ROLEPLAY DESTEK SİSTEMİ",
+        description="**Destek Talebi Oluştur**\n\nBilet oluşturmadan önce aşağıdaki kuralları okuyunuz. Aşağıdaki butonlardan size uygun kategoriyi seçerek destek talebi oluşturabilirsiniz.\n\n"
+                    "**Genel Kurallar:**\n"
+                    "• Biletinizi 24 saat içerisinde kontrol etmek zorundasınız.\n"
+                    "• Yönetim üyelerine özel mesaj atmaktan kaçının.\n"
+                    "• Sorunlarınızı bilet aracılığıyla iletin.",
+        color=discord.Color.blue()
+    )
+    embed.set_footer(text="Sancak Roleplay • Destek Sistemi", icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+    await banner_gonder(interaction.channel, embed, TicketPanel())
+    await interaction.response.send_message("✅ Ticket paneli kuruldu.", ephemeral=True)
 
 # ========================================
 # 10. MODERASYON
