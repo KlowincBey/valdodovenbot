@@ -1,3 +1,10 @@
+# ============================================================
+# SANCAK RP BOTU - TAM SÜRÜM
+# ============================================================
+# Tüm sistemler: Kayıt, Ticket, Moderasyon, Rol, İstatistik,
+# Etkinlik, Güvenlik (Anti-Nuke, Anti-Raid, Anti-Spam, Bot Koruma)
+# ============================================================
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -10,9 +17,9 @@ from collections import defaultdict
 from flask import Flask
 from threading import Thread
 
-# ========================================
-# FLASK
-# ========================================
+# ============================================================
+# FLASK (Render için)
+# ============================================================
 app = Flask(__name__)
 
 @app.route('/')
@@ -22,25 +29,25 @@ def home():
 def run_web():
     app.run(host='0.0.0.0', port=8080)
 
-# ========================================
+# ============================================================
 # BOT AYARLARI
-# ========================================
+# ============================================================
 intents = discord.Intents.all()
 intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
-# ========================================
-# YETKİLİ ROLLER
-# ========================================
+# ============================================================
+# YETKİLİ ROLLER (KENDİNE GÖRE DÜZENLE)
+# ============================================================
 YETKILI_ROLLER = ["Guard", "/Cmds", "Vise Team"]
 MOD_ROLLER = ["Guard", "/Cmds"]
 TICKET_ROLLER = ["Vise Team", "Guard"]
 KAYIT_YETKILI_ROLLER = ["Guard", "/Cmds", "Vise Team"]
 
-# ========================================
+# ============================================================
 # GÜVENLİK AYARLARI
-# ========================================
+# ============================================================
 GUARD_AKTIF = True
 ANTI_RAID_AKTIF = True
 ANTI_SPAM_AKTIF = True
@@ -63,7 +70,6 @@ SPAM_SURE = 5
 
 YASAKLI_KELIMELER = ["aptal", "salak", "gerizekalı", "amk", "sg", "siktir", "orospu", "pezevenk", "yarrak", "amcık"]
 
-# Bot koruma
 IZINLI_BOTLAR = []
 BOT_CEZA_TURU = "ban"
 BOT_EKLEYEN_CEZA = "ban"
@@ -71,9 +77,9 @@ BOT_EKLEYEN_CEZA = "ban"
 user_actions = defaultdict(list)
 user_messages = defaultdict(list)
 
-# ========================================
+# ============================================================
 # VERİTABANI
-# ========================================
+# ============================================================
 DB = "sancak_rp.db"
 
 def db_kur():
@@ -104,6 +110,8 @@ def db_kur():
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, sikayet_edilen TEXT, sebep TEXT, kanit TEXT, durum TEXT, tarih TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS istek_oneri
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, tip TEXT, baslik TEXT, icerik TEXT, durum TEXT, tarih TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS roblox_kayit
+                 (discord_id INTEGER PRIMARY KEY, roblox_id INTEGER, roblox_ismi TEXT, tarih TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS ayarlar
                  (anahtar TEXT PRIMARY KEY, deger TEXT)''')
     conn.commit()
@@ -129,9 +137,9 @@ def ayar_koy(anahtar, deger):
     conn.commit()
     conn.close()
 
-# ========================================
-# YARDIMCI
-# ========================================
+# ============================================================
+# YARDIMCI FONKSİYONLAR
+# ============================================================
 def yetkili_mi(member, roller):
     if member.id == member.guild.owner_id:
         return True
@@ -148,9 +156,9 @@ async def banner_gonder(kanal, embed, view):
     else:
         await kanal.send(embed=embed, view=view)
 
-# ========================================
+# ============================================================
 # GÜVENLİK FONKSİYONLARI
-# ========================================
+# ============================================================
 def action_kaydet(user_id, aksiyon):
     simdi = datetime.now().timestamp()
     user_actions[user_id] = [(a, t) for a, t in user_actions[user_id] if simdi - t < LIMIT_TIME]
@@ -212,22 +220,21 @@ def yeni_hesap_mi(uye):
     fark = datetime.now(uye.created_at.tzinfo) - uye.created_at
     return fark.days < YENI_HESAP_GUN
 
-# ========================================
-# HAZIR
-# ========================================
+# ============================================================
+# BOT HAZIR
+# ============================================================
 @bot.event
 async def on_ready():
     await bot.change_presence(activity=discord.Game(name="/yardim | Sancak RP 🛡️"))
-    print(f'✅ Sancak RP Güvenlik Tanrısı hazır: {bot.user}')
-    try:
-        synced = await bot.tree.sync()
-        print(f"✅ {len(synced)} slash komut senkronize edildi.")
-    except Exception as e:
-        print(f"❌ Sync hatası: {e}")
+    print(f'✅ Sancak RP Botu hazır: {bot.user}')
+    print(f'🛡️ Guard: {"AÇIK" if GUARD_AKTIF else "KAPALI"}')
+    print(f'🤖 Bot Koruma: {"AÇIK" if BOT_KORUMA_AKTIF else "KAPALI"}')
+    # NOT: Otomatik sync KALDIRILDI (rate limit önlemek için)
+    # Sync için /sync komutunu kullan
 
-# ========================================
-# GÜVENLİK EVENTLERİ
-# ========================================
+# ============================================================
+# GÜVENLİK EVENTLERİ (ANTI-NUKE)
+# ============================================================
 @bot.event
 async def on_guild_channel_delete(channel):
     if not GUARD_AKTIF: return
@@ -342,14 +349,13 @@ async def on_webhooks_update(channel):
             break
     except: pass
 
-# ========================================
+# ============================================================
 # ÜYE KATILMA (BOT KORUMA + ANTI-RAID + DM)
-# ========================================
+# ============================================================
 @bot.event
 async def on_member_join(member):
     guild = member.guild
     
-    # BOT KORUMASI
     if member.bot:
         if not BOT_KORUMA_AKTIF:
             return
@@ -386,7 +392,6 @@ async def on_member_join(member):
         except: pass
         return
     
-    # ANTI-RAID
     if ANTI_RAID_AKTIF and yeni_hesap_mi(member):
         try:
             await member.send(f"❌ **{guild.name}** sunucusuna katılamazsın. Hesabın çok yeni.")
@@ -396,7 +401,6 @@ async def on_member_join(member):
         await guvenlik_log(guild, "🚫 ANTI-RAID", member, "Yeni hesap")
         return
     
-    # Hoş geldin DM
     try:
         embed = discord.Embed(
             title="👋 Sancak Roleplay'e Hoş Geldin!",
@@ -410,9 +414,9 @@ async def on_member_join(member):
         await member.send(embed=embed)
     except: pass
 
-# ========================================
+# ============================================================
 # MESAJ (XP + KORUMA)
-# ========================================
+# ============================================================
 @bot.event
 async def on_message(message):
     if message.author.bot or not message.guild:
@@ -420,7 +424,6 @@ async def on_message(message):
     uye = message.author
     guild = message.guild
     
-    # SPAM
     if ANTI_SPAM_AKTIF and not yetkili_mi(uye, YETKILI_ROLLER):
         simdi = datetime.now().timestamp()
         user_messages[uye.id] = [t for t in user_messages[uye.id] if simdi - t < SPAM_SURE]
@@ -447,7 +450,6 @@ async def on_message(message):
             await guvenlik_log(guild, "⚠️ MENTION SPAM", uye, f"{len(message.mentions)} mention")
             return
     
-    # KÜFÜR
     if ANTI_KUFUR_AKTIF and not yetkili_mi(uye, YETKILI_ROLLER):
         for kelime in YASAKLI_KELIMELER:
             if kelime in message.content.lower():
@@ -458,7 +460,6 @@ async def on_message(message):
                 await guvenlik_log(guild, "⚠️ KÜFÜR", uye, message.content[:100])
                 return
     
-    # LİNK
     if ANTI_LINK_AKTIF and not yetkili_mi(uye, YETKILI_ROLLER):
         icerik = message.content.lower()
         if "discord.gg/" in icerik or "http://" in icerik or "https://" in icerik:
@@ -469,7 +470,6 @@ async def on_message(message):
             await guvenlik_log(guild, "⚠️ LİNK", uye, message.content[:100])
             return
     
-    # XP
     conn = db_baglan(); c = conn.cursor()
     c.execute("INSERT INTO uyeler (user_id, mesaj) VALUES (?, 1) ON CONFLICT(user_id) DO UPDATE SET mesaj = mesaj + 1", (uye.id,))
     c.execute("SELECT mesaj, xp, seviye FROM uyeler WHERE user_id = ?", (uye.id,))
@@ -485,9 +485,23 @@ async def on_message(message):
     conn.commit(); conn.close()
     await bot.process_commands(message)
 
-# ========================================
+# ============================================================
 # GÜVENLİK KOMUTLARI
-# ========================================
+# ============================================================
+@bot.tree.command(name="sync", description="Slash komutları yeniler (rate limit sonrası kullan)")
+@app_commands.default_permissions(administrator=True)
+async def sync_cmd(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    try:
+        bot.tree.copy_global_to(guild=interaction.guild)
+        synced = await bot.tree.sync(guild=interaction.guild)
+        await interaction.followup.send(
+            f"✅ **Sync başarılı!**\n• Sunucu: `{len(synced)}` komut\n\n"
+            f"Discord'u **Ctrl+R** ile yenile ve `/` yaz.",
+            ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Hata: `{e}`", ephemeral=True)
+
 @bot.tree.command(name="guard", description="Guard (Anti-Nuke) açar/kapatır")
 @app_commands.describe(durum="on veya off")
 @app_commands.default_permissions(administrator=True)
@@ -509,6 +523,7 @@ async def guvenlik_log_cmd(interaction, kanal: discord.TextChannel):
     await interaction.response.send_message(f"✅ Güvenlik log: {kanal.mention}", ephemeral=True)
 
 @bot.tree.command(name="idban", description="ID ile ban atar")
+@app_commands.describe(kullanici_id="Banlanacak kişinin ID'si", sebep="Ban sebebi")
 async def idban(interaction, kullanici_id: str, sebep: str = "Belirtilmedi"):
     if not yetkili_mi(interaction.user, MOD_ROLLER):
         await interaction.response.send_message("❌ Yetki yok!", ephemeral=True); return
@@ -605,13 +620,13 @@ async def izinli_botlar(interaction):
         await interaction.response.send_message("Boş.", ephemeral=True); return
     await interaction.response.send_message("\n".join([f"• `{b}`" for b in IZINLI_BOTLAR]), ephemeral=True)
 
-# ========================================
+# ============================================================
 # YARDIM
-# ========================================
+# ============================================================
 @bot.tree.command(name="yardim", description="Yardım menüsü")
 async def yardim(interaction):
     embed = discord.Embed(title="🎯 Sancak RP Güvenlik Tanrısı", description="Tüm komutlar:", color=discord.Color.blue())
-    embed.add_field(name="🛡️ GÜVENLİK", value="`/guard` `/guvenlik_log` `/guvenlik_durum` `/lockdown` `/unlock` `/idban` `/bot_ayar` `/izinli_botlar`", inline=False)
+    embed.add_field(name="🛡️ GÜVENLİK", value="`/guard` `/guvenlik_log` `/guvenlik_durum` `/lockdown` `/unlock` `/idban` `/bot_ayar` `/izinli_botlar` `/sync`", inline=False)
     embed.add_field(name="📝 Kayıt", value="`/kayitkur` `/karakterkur` `/arackur` `/iskur` `/ehliyetkur` `/silahkur` `/evkur` `/sikayetkur` `/yetkilikur` `/istekkur`", inline=False)
     embed.add_field(name="⚙️ Ayar", value="`/kayit_ayar` `/karakter_ayar` `/arac_ayar` `/is_ayar` `/ehliyet_ayar` `/silah_ayar` `/ev_ayar` `/sikayet_ayar` `/yetkili_ayar` `/istek_ayar`", inline=False)
     embed.add_field(name="🎫 Ticket", value="`/ticketkur`", inline=False)
@@ -624,36 +639,13 @@ async def yardim(interaction):
     embed.set_footer(text="Sancak Roleplay • Güvenlik Tanrısı")
     await interaction.response.send_message(embed=embed)
 
-# ========================================
-# KAYIT SİSTEMLERİ
-# ========================================
-
-class KayitFormu(discord.ui.Modal, title="Sancak Roleplay - Whitelist"):
-    soru1 = discord.ui.TextInput(label="1. Ad, Yaş, Kaynak", style=discord.TextStyle.short, required=True)
-    soru2 = discord.ui.TextInput(label="2. Meta Gaming & Fail RP", style=discord.TextStyle.paragraph, required=True)
-    soru3 = discord.ui.TextInput(label="3. IC & OOC", style=discord.TextStyle.paragraph, required=True)
-    soru4 = discord.ui.TextInput(label="4. VDM & RDM", style=discord.TextStyle.paragraph, required=True)
-    soru5 = discord.ui.TextInput(label="5. Örnek Kaza Rolü", style=discord.TextStyle.paragraph, required=True)
-    async def on_submit(self, interaction):
-        log_id = ayar_al("kayit_log_kanal")
-        if not log_id: await interaction.response.send_message("❌ Log yok!", ephemeral=True); return
-        log = interaction.guild.get_channel(int(log_id))
-        if not log: await interaction.response.send_message("❌ Kanal yok!", ephemeral=True); return
-        e = discord.Embed(title="📝 Whitelist",
-            description=f"**Başvuran:** {interaction.user.mention}\n**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
-            color=discord.Color.blue())
-        e.add_field(name="1", value=self.soru1.value[:1024], inline=False)
-        e.add_field(name="2", value=self.soru2.value[:1024], inline=False)
-        e.add_field(name="3", value=self.soru3.value[:1024], inline=False)
-        e.add_field(name="4", value=self.soru4.value[:1024], inline=False)
-        e.add_field(name="5", value=self.soru5.value[:1024], inline=False)
-        e.set_footer(text="Sancak Roleplay • Whitelist")
-        await log.send(embed=e, view=OnayView(interaction.user.id, "kayit"))
-        await interaction.response.send_message("✅ Başvurunuz alındı!", ephemeral=True)
-
+# ============================================================
+# ORTAK ONAY VIEW (Tüm başvurular için)
+# ============================================================
 class OnayView(discord.ui.View):
     def __init__(self, uid, tip):
         super().__init__(timeout=None); self.uid = uid; self.tip = tip
+    
     @discord.ui.button(label="Onayla", style=discord.ButtonStyle.success, emoji="✅")
     async def onayla(self, interaction, button):
         if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
@@ -666,8 +658,9 @@ class OnayView(discord.ui.View):
             if rid:
                 r = interaction.guild.get_role(int(rid))
                 if r: await uye.add_roles(r)
-            await uye.send(f"🎉 Tebrikler! Sancak Roleplay {self.tip} başvurunuz onaylandı!")
+            await uye.send(f"🎉 Tebrikler! Sancak Roleplay **{self.tip}** başvurunuz onaylandı!")
         except: pass
+        # DB güncelle
         if self.tip == "karakter":
             conn = db_baglan(); c = conn.cursor()
             c.execute("UPDATE karakterler SET durum='onaylandi' WHERE user_id=?", (self.uid,))
@@ -692,13 +685,14 @@ class OnayView(discord.ui.View):
         emb.set_footer(text=f"✅ Onaylayan: {interaction.user.display_name}")
         await interaction.message.edit(embed=emb, view=None)
         await interaction.response.send_message(f"✅ {uye.mention} onaylandı.", ephemeral=True)
+    
     @discord.ui.button(label="Reddet", style=discord.ButtonStyle.danger, emoji="❌")
     async def reddet(self, interaction, button):
         if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
             await interaction.response.send_message("❌ Yetki yok!", ephemeral=True); return
         uye = interaction.guild.get_member(self.uid)
         try:
-            if uye: await uye.send(f"Üzgünüz, {self.tip} başvurunuz reddedildi.")
+            if uye: await uye.send(f"Üzgünüz, **{self.tip}** başvurunuz reddedildi.")
         except: pass
         if self.tip == "karakter":
             conn = db_baglan(); c = conn.cursor()
@@ -725,6 +719,32 @@ class OnayView(discord.ui.View):
         await interaction.message.edit(embed=emb, view=None)
         await interaction.response.send_message("❌ Reddedildi.", ephemeral=True)
 
+# ============================================================
+# 1. WHITELIST KAYIT
+# ============================================================
+class KayitFormu(discord.ui.Modal, title="Sancak Roleplay - Whitelist"):
+    soru1 = discord.ui.TextInput(label="1. Ad, Yaş, Kaynak", style=discord.TextStyle.short, required=True)
+    soru2 = discord.ui.TextInput(label="2. Meta Gaming & Fail RP", style=discord.TextStyle.paragraph, required=True)
+    soru3 = discord.ui.TextInput(label="3. IC & OOC", style=discord.TextStyle.paragraph, required=True)
+    soru4 = discord.ui.TextInput(label="4. VDM & RDM", style=discord.TextStyle.paragraph, required=True)
+    soru5 = discord.ui.TextInput(label="5. Örnek Kaza Rolü", style=discord.TextStyle.paragraph, required=True)
+    async def on_submit(self, interaction):
+        log_id = ayar_al("kayit_log_kanal")
+        if not log_id: await interaction.response.send_message("❌ Log yok!", ephemeral=True); return
+        log = interaction.guild.get_channel(int(log_id))
+        if not log: await interaction.response.send_message("❌ Kanal yok!", ephemeral=True); return
+        e = discord.Embed(title="📝 Whitelist",
+            description=f"**Başvuran:** {interaction.user.mention}\n**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+            color=discord.Color.blue())
+        e.add_field(name="1", value=self.soru1.value[:1024], inline=False)
+        e.add_field(name="2", value=self.soru2.value[:1024], inline=False)
+        e.add_field(name="3", value=self.soru3.value[:1024], inline=False)
+        e.add_field(name="4", value=self.soru4.value[:1024], inline=False)
+        e.add_field(name="5", value=self.soru5.value[:1024], inline=False)
+        e.set_footer(text="Sancak Roleplay • Whitelist")
+        await log.send(embed=e, view=OnayView(interaction.user.id, "kayit"))
+        await interaction.response.send_message("✅ Başvurunuz alındı!", ephemeral=True)
+
 class KayitPaneli(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
     @discord.ui.button(label="Kayıt Ol", style=discord.ButtonStyle.primary, emoji="➕", custom_id="kayit_btn")
@@ -747,7 +767,9 @@ async def kayit_ayar(interaction, log_kanal: discord.TextChannel, verilecek_rol:
     ayar_koy("kayit_log_kanal", log_kanal.id); ayar_koy("kayit_verilecek_rol", verilecek_rol.id)
     await interaction.response.send_message("✅ Ayarlandı.", ephemeral=True)
 
-# KARAKTER
+# ============================================================
+# 2. KARAKTER
+# ============================================================
 class KarakterFormu(discord.ui.Modal, title="Sancak Roleplay - Karakter"):
     isim = discord.ui.TextInput(label="Karakter İsmi", style=discord.TextStyle.short, required=True)
     yas = discord.ui.TextInput(label="Karakter Yaşı", style=discord.TextStyle.short, required=True)
@@ -808,7 +830,9 @@ async def karakter_bilgi(interaction, kullanici: discord.Member = None):
     e.add_field(name="Hikaye", value=k[3][:1024], inline=False)
     await interaction.response.send_message(embed=e)
 
-# ARAÇ
+# ============================================================
+# 3. ARAÇ
+# ============================================================
 class AracFormu(discord.ui.Modal, title="Sancak Roleplay - Araç"):
     plaka = discord.ui.TextInput(label="Plaka", style=discord.TextStyle.short, required=True)
     marka = discord.ui.TextInput(label="Marka", style=discord.TextStyle.short, required=True)
@@ -856,7 +880,9 @@ async def arac_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("arac_log_kanal", log_kanal.id)
     await interaction.response.send_message("✅ Ayarlandı.", ephemeral=True)
 
-# İŞ
+# ============================================================
+# 4. İŞ
+# ============================================================
 class IsFormu(discord.ui.Modal, title="Sancak Roleplay - İş Başvurusu"):
     is_turu = discord.ui.TextInput(label="İş Türü", style=discord.TextStyle.short, required=True)
     isim = discord.ui.TextInput(label="Karakter İsmi", style=discord.TextStyle.short, required=True)
@@ -905,7 +931,9 @@ async def is_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("is_log_kanal", log_kanal.id)
     await interaction.response.send_message("✅ Ayarlandı.", ephemeral=True)
 
-# EHLİYET
+# ============================================================
+# 5. EHLİYET
+# ============================================================
 class EhliyetFormu(discord.ui.Modal, title="Sancak Roleplay - Ehliyet"):
     isim = discord.ui.TextInput(label="Ad Soyad", style=discord.TextStyle.short, required=True)
     yas = discord.ui.TextInput(label="Yaş", style=discord.TextStyle.short, required=True)
@@ -951,7 +979,9 @@ async def ehliyet_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("ehliyet_log_kanal", log_kanal.id)
     await interaction.response.send_message("✅ Ayarlandı.", ephemeral=True)
 
-# SİLAH
+# ============================================================
+# 6. SİLAH
+# ============================================================
 class SilahFormu(discord.ui.Modal, title="Sancak Roleplay - Silah Ruhsatı"):
     isim = discord.ui.TextInput(label="Ad Soyad", style=discord.TextStyle.short, required=True)
     silah_turu = discord.ui.TextInput(label="Silah Türü", style=discord.TextStyle.short, required=True)
@@ -997,7 +1027,9 @@ async def silah_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("silah_log_kanal", log_kanal.id)
     await interaction.response.send_message("✅ Ayarlandı.", ephemeral=True)
 
-# EV
+# ============================================================
+# 7. EV
+# ============================================================
 class EvFormu(discord.ui.Modal, title="Sancak Roleplay - Ev"):
     isim = discord.ui.TextInput(label="Ad Soyad", style=discord.TextStyle.short, required=True)
     ev_adresi = discord.ui.TextInput(label="Adres", style=discord.TextStyle.short, required=True)
@@ -1043,7 +1075,9 @@ async def ev_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("ev_log_kanal", log_kanal.id)
     await interaction.response.send_message("✅ Ayarlandı.", ephemeral=True)
 
-# ŞİKAYET
+# ============================================================
+# 8. ŞİKAYET
+# ============================================================
 class SikayetFormu(discord.ui.Modal, title="Sancak Roleplay - Şikayet"):
     sikayet_edilen = discord.ui.TextInput(label="Şikayet Edilen", style=discord.TextStyle.short, required=True)
     sebep = discord.ui.TextInput(label="Sebep", style=discord.TextStyle.paragraph, required=True)
@@ -1087,7 +1121,9 @@ async def sikayet_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("sikayet_log_kanal", log_kanal.id)
     await interaction.response.send_message("✅ Ayarlandı.", ephemeral=True)
 
-# YETKİLİ
+# ============================================================
+# 9. YETKİLİ
+# ============================================================
 class YetkiliFormu(discord.ui.Modal, title="Sancak Roleplay - Yetkili Başvuru"):
     isim = discord.ui.TextInput(label="Ad Soyad", style=discord.TextStyle.short, required=True)
     yas = discord.ui.TextInput(label="Yaş", style=discord.TextStyle.short, required=True)
@@ -1131,7 +1167,9 @@ async def yetkili_ayar(interaction, log_kanal: discord.TextChannel, verilecek_ro
     ayar_koy("yetkili_log_kanal", log_kanal.id); ayar_koy("yetkili_verilecek_rol", verilecek_rol.id)
     await interaction.response.send_message("✅ Ayarlandı.", ephemeral=True)
 
-# İSTEK
+# ============================================================
+# 10. İSTEK
+# ============================================================
 class IstekFormu(discord.ui.Modal, title="Sancak Roleplay - İstek & Öneri"):
     tip = discord.ui.TextInput(label="Tip", style=discord.TextStyle.short, placeholder="İstek/Öneri/Şikayet", required=True)
     baslik = discord.ui.TextInput(label="Başlık", style=discord.TextStyle.short, required=True)
@@ -1174,9 +1212,9 @@ async def istek_ayar(interaction, log_kanal: discord.TextChannel):
     ayar_koy("istek_log_kanal", log_kanal.id)
     await interaction.response.send_message("✅ Ayarlandı.", ephemeral=True)
 
-# ========================================
-# TICKET
-# ========================================
+# ============================================================
+# 11. TICKET
+# ============================================================
 class TicketPanel(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
     @discord.ui.button(label="Oyun İçi", style=discord.ButtonStyle.primary, emoji="🎮", custom_id="t_oyun")
@@ -1239,9 +1277,9 @@ async def ticketkur(interaction):
     await banner_gonder(interaction.channel, e, TicketPanel())
     await interaction.response.send_message("✅ Kuruldu.", ephemeral=True)
 
-# ========================================
-# MODERASYON
-# ========================================
+# ============================================================
+# 12. MODERASYON
+# ============================================================
 @bot.tree.command(name="ban", description="Ban atar")
 async def ban(interaction, kullanici: discord.Member, sebep: str = "Belirtilmedi"):
     if not yetkili_mi(interaction.user, MOD_ROLLER):
@@ -1326,9 +1364,9 @@ async def uyarilar(interaction, kullanici: discord.Member):
     m = "\n".join([f"• {s} ({t[:10]})" for s, t in ks])
     await interaction.response.send_message(embed=embed_yap(f"⚠️ {kullanici.display_name}", m, discord.Color.orange()))
 
-# ========================================
-# ROL
-# ========================================
+# ============================================================
+# 13. ROL
+# ============================================================
 @bot.tree.command(name="rolver", description="Rol verir")
 async def rolver(interaction, kullanici: discord.Member, rol: discord.Role):
     if not yetkili_mi(interaction.user, YETKILI_ROLLER):
@@ -1356,9 +1394,9 @@ async def toplurol(interaction, rol: discord.Role):
         except: pass
     await interaction.channel.send(f"✅ {s} üyeye verildi.")
 
-# ========================================
-# İSTATİSTİK
-# ========================================
+# ============================================================
+# 14. İSTATİSTİK
+# ============================================================
 @bot.tree.command(name="profil", description="Profil")
 async def profil(interaction, kullanici: discord.Member = None):
     if kullanici is None: kullanici = interaction.user
@@ -1398,9 +1436,9 @@ async def gunluk(interaction):
     conn.commit(); conn.close()
     await interaction.response.send_message(embed=embed_yap("🎁 GÜNLÜK", f"**+{o} XP**", discord.Color.green()))
 
-# ========================================
-# ETKİNLİK
-# ========================================
+# ============================================================
+# 15. ETKİNLİK
+# ============================================================
 @bot.tree.command(name="duyuru", description="Duyuru")
 @app_commands.default_permissions(administrator=True)
 async def duyuru(interaction, baslik: str, mesaj: str):
@@ -1434,9 +1472,9 @@ async def cekilis(interaction, odul: str, sure: int):
                 kz = random.choice(us)
                 await interaction.channel.send(f"🎉 Tebrikler {kz.mention}! **{odul}**")
 
-# ========================================
-# YÖNETİM
-# ========================================
+# ============================================================
+# 16. YÖNETİM
+# ============================================================
 @bot.tree.command(name="log_kanal", description="Log kanalı")
 @app_commands.default_permissions(administrator=True)
 async def log_kanal(interaction, kanal: discord.TextChannel):
@@ -1469,9 +1507,9 @@ async def ayarlar(interaction):
             e.add_field(name=i, value=d, inline=True)
     await interaction.response.send_message(embed=e)
 
-# ========================================
-# EĞLENCE
-# ========================================
+# ============================================================
+# 17. EĞLENCE
+# ============================================================
 @bot.tree.command(name="zar", description="Zar")
 async def zar(interaction): await interaction.response.send_message(f"🎲 **{random.randint(1, 6)}**")
 
@@ -1481,13 +1519,13 @@ async def yazitura(interaction): await interaction.response.send_message(f"🪙 
 @bot.tree.command(name="espri", description="Espri")
 async def espri(interaction): await interaction.response.send_message(f"😂 {random.choice(['Sinüsleri var.', 'Antivirüs var.', 'Bug var.'])}")
 
-# ========================================
+# ============================================================
 # BAŞLATMA
-# ========================================
+# ============================================================
 if __name__ == "__main__":
     Thread(target=run_web).start()
     token = os.environ.get('DISCORD_TOKEN')
     if token:
         bot.run(token)
     else:
-        print("❌ Token yok")
+        print("❌ DISCORD_TOKEN ayarlanmamış!")
