@@ -5,7 +5,6 @@ import asyncio
 import os
 import random
 import sqlite3
-import time
 from datetime import datetime, timedelta
 from flask import Flask
 from threading import Thread
@@ -39,9 +38,10 @@ bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 YETKILI_ROLLER = ["Guard", "/Cmds", "Vise Team"]
 MOD_ROLLER = ["Guard", "/Cmds"]
 TICKET_ROLLER = ["Vise Team", "Guard"]
+KAYIT_YETKILI_ROLLER = ["Guard", "/Cmds", "Vise Team"]
 
 # ========================================
-# VERİTABANI (TEK DOSYADA)
+# VERİTABANI
 # ========================================
 
 DB = "sancak_rp.db"
@@ -169,6 +169,28 @@ async def on_message(message):
     await bot.process_commands(message)
 
 # ========================================
+# YENİ ÜYEYE DM
+# ========================================
+
+@bot.event
+async def on_member_join(member):
+    try:
+        embed = discord.Embed(
+            title="👋 Sunucuya Hoş Geldin!",
+            description=f"Merhaba **{member.display_name}**,\n\n"
+                        f"**{member.guild.name}** sunucumuza hoş geldin!\n\n"
+                        f"Rol yapmaya başlamadan önce kayıt olman gerekiyor.\n\n"
+                        f"📝 Kayıt olmak için **#kayıt** kanalına git, "
+                        f"**Kayıt Ol** butonuna tıkla ve formu doldur.\n\n"
+                        f"Başvurun onaylandığında sana bir rol verilecek ve rol yapmaya başlayabilirsin.",
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text="Sancak Roleplay • Kayıt Sistemi")
+        await member.send(embed=embed)
+    except:
+        pass
+
+# ========================================
 # SLASH: YARDIM
 # ========================================
 
@@ -181,6 +203,7 @@ async def yardim(interaction: discord.Interaction):
         timestamp=datetime.now()
     )
     embed.add_field(name="🎫 Ticket", value="`/ticketkur`", inline=False)
+    embed.add_field(name="📝 Kayıt", value="`/kayitkur` `/kayit_ayar`", inline=False)
     embed.add_field(name="🎭 Rol Sistemi", value="`/rolver` `/rolal` `/toplurol`", inline=False)
     embed.add_field(name="⚖️ Moderasyon", value="`/ban` `/kick` `/ipban` `/uyari` `/uyarilar`", inline=False)
     embed.add_field(name="📊 İstatistik", value="`/profil` `/liderlik` `/gunluk`", inline=False)
@@ -189,6 +212,165 @@ async def yardim(interaction: discord.Interaction):
     embed.add_field(name="⚙️ Yönetim", value="`/log_kanal` `/ticket_kategori` `/ayarlar`", inline=False)
     embed.set_footer(text="Sancak RP • Destek Sistemi")
     await interaction.response.send_message(embed=embed)
+
+# ========================================
+# KAYIT SİSTEMİ
+# ========================================
+
+class KayitFormu(discord.ui.Modal, title="Whitelist Başvuru Formu"):
+    soru1 = discord.ui.TextInput(
+        label="1. Adınız, Yaşınız ve Bizi Nereden Buldunuz?",
+        style=discord.TextStyle.short,
+        placeholder="Gerçek adınız, yaşınız ve sunucuyu bulma şekliniz.",
+        required=True
+    )
+    soru2 = discord.ui.TextInput(
+        label="2. Meta Gaming ve Fail RP Nedir?",
+        style=discord.TextStyle.paragraph,
+        placeholder="Lütfen iki terimi de kendi cümlelerinizle açıklayın.",
+        required=True
+    )
+    soru3 = discord.ui.TextInput(
+        label="3. IC ve OOC Nedir?",
+        style=discord.TextStyle.paragraph,
+        placeholder="IC (In Character) ve OOC (Out of Character) nedir?",
+        required=True
+    )
+    soru4 = discord.ui.TextInput(
+        label="4. VDM ve RDM Nedir?",
+        style=discord.TextStyle.paragraph,
+        placeholder="VDM ve RDM kurallarını kısaca açıklayın.",
+        required=True
+    )
+    soru5 = discord.ui.TextInput(
+        label="5. Örnek Kaza Rolü (/me ve /do)",
+        style=discord.TextStyle.paragraph,
+        placeholder="/me ve /do kullanarak örnek bir kaza rolü yazın.",
+        required=True
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        log_kanal_id = ayar_al("kayit_log_kanal")
+        if not log_kanal_id:
+            await interaction.response.send_message("❌ Kayıt log kanalı ayarlanmamış!", ephemeral=True)
+            return
+        log_kanal = interaction.guild.get_channel(int(log_kanal_id))
+        if not log_kanal:
+            await interaction.response.send_message("❌ Log kanalı bulunamadı!", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title="📝 Yeni Whitelist Başvurusu",
+            description=f"**Başvuran:** {interaction.user.mention} (`{interaction.user.id}`)\n"
+                        f"**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="1. Ad, Yaş, Kaynak", value=self.soru1.value[:1024], inline=False)
+        embed.add_field(name="2. Meta Gaming & Fail RP", value=self.soru2.value[:1024], inline=False)
+        embed.add_field(name="3. IC & OOC", value=self.soru3.value[:1024], inline=False)
+        embed.add_field(name="4. VDM & RDM", value=self.soru4.value[:1024], inline=False)
+        embed.add_field(name="5. Örnek Kaza Rolü", value=self.soru5.value[:1024], inline=False)
+        embed.set_footer(text="Sancak Roleplay • Whitelist Sistemi")
+
+        view = KayitOnay(interaction.user.id)
+        await log_kanal.send(embed=embed, view=view)
+
+        await interaction.response.send_message(
+            "✅ Başvurunuz alındı! Yetkililer en kısa sürede inceleyecek. Sonuç DM'den bildirilecek.",
+            ephemeral=True
+        )
+
+
+class KayitOnay(discord.ui.View):
+    def __init__(self, kullanici_id: int):
+        super().__init__(timeout=None)
+        self.kullanici_id = kullanici_id
+
+    @discord.ui.button(label="Onayla", style=discord.ButtonStyle.success, emoji="✅")
+    async def onayla(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Bu butonu kullanma yetkin yok!", ephemeral=True)
+            return
+
+        uye = interaction.guild.get_member(self.kullanici_id)
+        if not uye:
+            await interaction.response.send_message("❌ Kullanıcı sunucuda bulunamadı.", ephemeral=True)
+            return
+
+        rol_id = ayar_al("kayit_verilecek_rol")
+        try:
+            if rol_id:
+                rol = interaction.guild.get_role(int(rol_id))
+                if rol:
+                    await uye.add_roles(rol)
+            await uye.send("🎉 Tebrikler! Kaydınız kabul edildi. İyi rol yapmalar!")
+        except:
+            pass
+
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.green()
+        embed.set_footer(text=f"✅ Onaylayan: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message(f"✅ {uye.mention} onaylandı ve rol verildi.", ephemeral=True)
+
+    @discord.ui.button(label="Reddet", style=discord.ButtonStyle.danger, emoji="❌")
+    async def reddet(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not yetkili_mi(interaction.user, KAYIT_YETKILI_ROLLER):
+            await interaction.response.send_message("❌ Bu butonu kullanma yetkin yok!", ephemeral=True)
+            return
+
+        uye = interaction.guild.get_member(self.kullanici_id)
+        try:
+            if uye:
+                await uye.send("Üzgünüz, başvurunuz reddedildi. Tekrar deneyebilirsiniz.")
+        except:
+            pass
+
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.red()
+        embed.set_footer(text=f"❌ Reddeden: {interaction.user.display_name}")
+        await interaction.message.edit(embed=embed, view=None)
+        await interaction.response.send_message("❌ Başvuru reddedildi.", ephemeral=True)
+
+
+class KayitPaneli(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Kayıt Ol", style=discord.ButtonStyle.primary, emoji="➕", custom_id="kayit_ol")
+    async def kayit_ol(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(KayitFormu())
+
+
+@bot.tree.command(name="kayitkur", description="Kayıt panelini kurar")
+@app_commands.default_permissions(administrator=True)
+async def kayitkur(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🎫 TURAN ROLEPLAY KAYIT SİSTEMİ",
+        description="**Hoş Geldiniz!**\n\n"
+                    "Sunucumuza katılmak ve rol yapmaya başlamak için öncelikle kayıt başvurusunda bulunmanız gerekmektedir.\n\n"
+                    "Aşağıdaki buton aracılığıyla başvuru formunu doldurabilirsiniz. "
+                    "Başvurunuz yetkili ekibimiz tarafından incelenecek ve en kısa sürede sonuçlandırılacaktır.\n\n"
+                    "⚠️ **Unutmayın:** Lütfen formu doldururken kurallarımızı ve temel rol yapma terimlerini "
+                    "(Meta Gaming, Fail RP vb.) bildiğinizden emin olun.",
+        color=discord.Color.blue()
+    )
+    embed.set_footer(text="Sancak Roleplay • Whitelist Sistemi")
+    await interaction.channel.send(embed=embed, view=KayitPaneli())
+    await interaction.response.send_message("✅ Kayıt paneli kuruldu.", ephemeral=True)
+
+
+@bot.tree.command(name="kayit_ayar", description="Kayıt sistemini ayarlar (Admin)")
+@app_commands.default_permissions(administrator=True)
+async def kayit_ayar(interaction: discord.Interaction, log_kanal: discord.TextChannel, verilecek_rol: discord.Role):
+    ayar_koy("kayit_log_kanal", log_kanal.id)
+    ayar_koy("kayit_verilecek_rol", verilecek_rol.id)
+    embed = discord.Embed(
+        title="✅ Kayıt Sistemi Ayarlandı",
+        description=f"**Log Kanalı:** {log_kanal.mention}\n**Verilecek Rol:** {verilecek_rol.mention}",
+        color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # ========================================
 # TICKET SİSTEMİ
@@ -258,33 +440,18 @@ async def ticket_ac(interaction: discord.Interaction, kategori: str):
     embed = discord.Embed(
         title=f"🎫 Destek Talebi #{ticket_sayisi:04d}",
         description=f"{user.mention} tarafından **{kategori}** kategorisinde oluşturuldu.\n\n"
-                    f"**Destek ID:** #{ticket_sayisi:04d}\n"
                     f"**Kategori:** {kategori}\n"
                     f"**Oluşturan:** {user.mention}\n"
                     f"**Tarih:** {datetime.now().strftime('%d.%m.%Y %H:%M')}",
         color=discord.Color.blue()
     )
-    embed.set_footer(text="Sancak RP Destek Sistemi")
-    await kanal.send(content=user.mention + " | Yetkililer ilgilenecek.", embed=embed, view=TicketKontrol())
+    await kanal.send(content=user.mention, embed=embed, view=TicketKontrol())
     await interaction.response.send_message(f"✅ Ticket açıldı: {kanal.mention}", ephemeral=True)
-    await log_gonder(guild, "TICKET", user, f"{kategori} - {kanal.mention}")
 
 
 class TicketKontrol(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-
-    @discord.ui.button(label="Ticket Claim", style=discord.ButtonStyle.secondary, emoji="🙋", custom_id="ticket_claim")
-    async def claim(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(f"✅ {interaction.user.mention} ticketı üstlendi.")
-
-    @discord.ui.button(label="Beklemede", style=discord.ButtonStyle.primary, emoji="⏸️", custom_id="ticket_bekleme")
-    async def bekleme(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("⏸️ Ticket beklemede.")
-
-    @discord.ui.button(label="İnceleniyor", style=discord.ButtonStyle.primary, emoji="🔍", custom_id="ticket_inceleniyor")
-    async def inceleniyor(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🔍 İnceleniyor.")
 
     @discord.ui.button(label="Çözüldü", style=discord.ButtonStyle.success, emoji="✅", custom_id="ticket_cozuldu")
     async def cozuldu(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -293,7 +460,7 @@ class TicketKontrol(discord.ui.View):
         c.execute("UPDATE tickets SET durum = 'kapali' WHERE kanal_id = ?", (interaction.channel.id,))
         conn.commit()
         conn.close()
-        await interaction.response.send_message("✅ Çözüldü. 5 saniye içinde siliniyor...")
+        await interaction.response.send_message("✅ Çözüldü. Siliniyor...")
         await asyncio.sleep(5)
         await interaction.channel.delete()
 
@@ -314,17 +481,9 @@ class TicketKontrol(discord.ui.View):
 async def ticketkur(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🎫 Sancak RP Destek Sistemi",
-        description="Bilet oluşturmadan önce aşağıdaki kuralları okuyunuz. Aşağıdaki butonlardan size uygun kategoriyi seçerek destek talebi oluşturabilirsiniz.\n\n"
-                    "**Genel Kurallar:**\n"
-                    "• Biletinizi 24 saat içinde kontrol etmek zorundasınız.\n"
-                    "• Yönetim üyelerine özel mesaj atmaktan kaçının.\n"
-                    "• Sorunlarınızı bilet aracılığıyla iletin.\n\n"
-                    "**Sorun Bildirimi:**\n"
-                    "• Sorunu detaylı açıklayın.\n"
-                    "• Gerekli bilgileri eksiksiz paylaşın.",
+        description="Bilet oluşturmak için butonlara tıklayın.",
         color=discord.Color.blue()
     )
-    embed.set_footer(text="Sancak RP • Destek")
     await interaction.channel.send(embed=embed, view=TicketPanel())
     await interaction.response.send_message("✅ Panel kuruldu.", ephemeral=True)
 
@@ -340,7 +499,6 @@ async def rolver(interaction: discord.Interaction, kullanici: discord.Member, ro
     try:
         await kullanici.add_roles(rol)
         await interaction.response.send_message(embed=embed_yap("🎭 ROL VERİLDİ", f"{kullanici.mention} → {rol.mention}", discord.Color.green()))
-        await log_gonder(interaction.guild, "ROL VERME", interaction.user, f"{kullanici} → {rol.name}")
     except Exception as e:
         await interaction.response.send_message(f"❌ Hata: {e}", ephemeral=True)
 
@@ -353,7 +511,6 @@ async def rolal(interaction: discord.Interaction, kullanici: discord.Member, rol
     try:
         await kullanici.remove_roles(rol)
         await interaction.response.send_message(embed=embed_yap("🎭 ROL ALINDI", f"{kullanici.mention} ← {rol.mention}", discord.Color.red()))
-        await log_gonder(interaction.guild, "ROL ALMA", interaction.user, f"{kullanici} → {rol.name}")
     except Exception as e:
         await interaction.response.send_message(f"❌ Hata: {e}", ephemeral=True)
 
@@ -363,7 +520,7 @@ async def toplurol(interaction: discord.Interaction, rol: discord.Role):
     if not yetkili_mi(interaction.user, YETKILI_ROLLER):
         await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
         return
-    await interaction.response.send_message(f"🎭 {rol.mention} tüm üyelere veriliyor...", ephemeral=True)
+    await interaction.response.send_message(f"🎭 {rol.mention} veriliyor...", ephemeral=True)
     sayac = 0
     for uye in interaction.guild.members:
         if uye.bot:
@@ -374,7 +531,7 @@ async def toplurol(interaction: discord.Interaction, rol: discord.Role):
             await asyncio.sleep(0.3)
         except:
             pass
-    await interaction.channel.send(f"✅ {sayac} üyeye {rol.mention} verildi.")
+    await interaction.channel.send(f"✅ {sayac} üyeye verildi.")
 
 # ========================================
 # MODERASYON
@@ -388,7 +545,6 @@ async def ban(interaction: discord.Interaction, kullanici: discord.Member, sebep
     try:
         await interaction.guild.ban(kullanici, reason=f"{sebep} | {interaction.user}")
         await interaction.response.send_message(embed=embed_yap("🔨 BAN", f"{kullanici.mention} banlandı.\n**Sebep:** {sebep}", discord.Color.dark_red()))
-        await log_gonder(interaction.guild, "BAN", interaction.user, f"{kullanici} - {sebep}")
     except Exception as e:
         await interaction.response.send_message(f"❌ Hata: {e}", ephemeral=True)
 
@@ -401,12 +557,11 @@ async def kick(interaction: discord.Interaction, kullanici: discord.Member, sebe
     try:
         await kullanici.kick(reason=f"{sebep} | {interaction.user}")
         await interaction.response.send_message(embed=embed_yap("👢 KICK", f"{kullanici.mention} atıldı.\n**Sebep:** {sebep}", discord.Color.orange()))
-        await log_gonder(interaction.guild, "KICK", interaction.user, f"{kullanici} - {sebep}")
     except Exception as e:
         await interaction.response.send_message(f"❌ Hata: {e}", ephemeral=True)
 
 
-@bot.tree.command(name="ipban", description="IP ban atar (Guard/Cmds)")
+@bot.tree.command(name="ipban", description="IP ban atar")
 async def ipban(interaction: discord.Interaction, kullanici: discord.Member, sebep: str = "Belirtilmedi"):
     if not yetkili_mi(interaction.user, MOD_ROLLER):
         await interaction.response.send_message("❌ Yetki yok!", ephemeral=True)
@@ -420,7 +575,6 @@ async def ipban(interaction: discord.Interaction, kullanici: discord.Member, seb
         conn.commit()
         conn.close()
         await interaction.response.send_message(embed=embed_yap("🚫 IP BAN", f"{kullanici.mention} IP banlandı.\n**Sebep:** {sebep}", discord.Color.dark_red()))
-        await log_gonder(interaction.guild, "IP BAN", interaction.user, f"{kullanici} - {sebep}")
     except Exception as e:
         await interaction.response.send_message(f"❌ Hata: {e}", ephemeral=True)
 
@@ -434,7 +588,6 @@ async def uyari(interaction: discord.Interaction, kullanici: discord.Member, seb
     c = conn.cursor()
     c.execute("INSERT INTO uyarilar (user_id, sebep, yetkili_id, tarih) VALUES (?, ?, ?, ?)",
               (kullanici.id, sebep, interaction.user.id, datetime.now().isoformat()))
-    c.execute("UPDATE uyeler SET uyari = uyari + 1 WHERE user_id = ?", (kullanici.id,))
     conn.commit()
     conn.close()
     await interaction.response.send_message(embed=embed_yap("⚠️ UYARI", f"{kullanici.mention} uyarıldı.\n**Sebep:** {sebep}", discord.Color.yellow()))
@@ -529,18 +682,6 @@ async def karakter(interaction: discord.Interaction, isim: str, yas: int, meslek
     embed.add_field(name="Hikaye", value=hikaye[:1024], inline=False)
     await interaction.response.send_message(embed=embed)
 
-
-@bot.tree.command(name="basvuru", description="Başvuru yapar")
-async def basvuru(interaction: discord.Interaction, tip: str, icerik: str):
-    conn = db_baglan()
-    c = conn.cursor()
-    c.execute("INSERT INTO basvurular (user_id, tip, icerik, durum, tarih) VALUES (?, ?, ?, 'beklemede', ?)",
-              (interaction.user.id, tip, icerik, datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-    await interaction.response.send_message(embed=embed_yap("📝 BAŞVURU ALINDI", f"**Tip:** {tip}\n**Durum:** Beklemede", discord.Color.blue()))
-    await log_gonder(interaction.guild, "BAŞVURU", interaction.user, f"{tip}: {icerik[:100]}")
-
 # ========================================
 # ETKİNLİK
 # ========================================
@@ -548,8 +689,7 @@ async def basvuru(interaction: discord.Interaction, tip: str, icerik: str):
 @bot.tree.command(name="duyuru", description="Duyuru atar (Admin)")
 @app_commands.default_permissions(administrator=True)
 async def duyuru(interaction: discord.Interaction, baslik: str, mesaj: str):
-    embed = discord.Embed(title=f"📢 {baslik}", description=mesaj, color=discord.Color.red(), timestamp=datetime.now())
-    embed.set_footer(text=f"Duyuran: {interaction.user.display_name}")
+    embed = discord.Embed(title=f"📢 {baslik}", description=mesaj, color=discord.Color.red())
     await interaction.channel.send("@everyone", embed=embed)
     await interaction.response.send_message("✅ Duyuru atıldı.", ephemeral=True)
 
@@ -606,9 +746,13 @@ async def ticket_kategori(interaction: discord.Interaction, kategori: discord.Ca
 async def ayarlar(interaction: discord.Interaction):
     log_k = ayar_al("log_kanal", "Ayarlanmadı")
     ticket_k = ayar_al("ticket_kategori", "Ayarlanmadı")
+    kayit_log = ayar_al("kayit_log_kanal", "Ayarlanmadı")
+    kayit_rol = ayar_al("kayit_verilecek_rol", "Ayarlanmadı")
     embed = discord.Embed(title="⚙️ Bot Ayarları", color=discord.Color.blue())
     embed.add_field(name="Log Kanalı", value=f"<#{log_k}>" if log_k != "Ayarlanmadı" else log_k)
     embed.add_field(name="Ticket Kategorisi", value=f"<#{ticket_k}>" if ticket_k != "Ayarlanmadı" else ticket_k)
+    embed.add_field(name="Kayıt Log Kanalı", value=f"<#{kayit_log}>" if kayit_log != "Ayarlanmadı" else kayit_log)
+    embed.add_field(name="Kayıt Verilecek Rol", value=f"<@&{kayit_rol}>" if kayit_rol != "Ayarlanmadı" else kayit_rol)
     await interaction.response.send_message(embed=embed)
 
 # ========================================
